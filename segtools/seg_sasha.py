@@ -129,28 +129,6 @@ def matching_score(matching):
   print("{} matches out of {} GT objects and {} predicted objects.".format(matching.sum(), matching.shape[0], matching.shape[1]))
   return (matching.sum(), matching.shape[0], matching.shape[1])
 
-@jit
-def relabel_img(img, mapping_array=None):
-  """
-  Permute the labels on a labeled image according to `mapping_array`, if `mapping_array` not given
-  then permute them randomly.
-  Returns a copy of `img`.
-  """
-  res = img.copy()
-  if mapping_array is None:
-      mapping_array = np.arange(img.max()+1)
-      np.random.shuffle(mapping_array)
-  if img.ndim==2:
-    for i in range(img.shape[0]):
-        for j in range(img.shape[1]):
-            res[i,j] = mapping_array[img[i,j]]
-  elif img.ndim==3:
-    for i in range(img.shape[0]):
-        for j in range(img.shape[1]):
-          for k in range(img.shape[2]):
-              res[i,j,k] = mapping_array[img[i,j,k]]
-  return res
-
 def mapping_from_matching(matching):
   """
   return the mapping from seg labels (dim 1) to gt labels (dim 0).
@@ -176,17 +154,17 @@ def condense_labels(lab):
   newlabels = np.arange(len(uniq))
   for k,v in zip(uniq, newlabels):
     mapping[k] = v
-  newlab, mapinv = apply_mapping(lab, mapping)
+  newlab, mapinv = apply_scalar_mapping(lab, mapping)
   return newlab, mapinv
 
-def apply_mapping(lab, mapping):
+def apply_scalar_mapping(lab, mapping):
   maxlabel = max(mapping.keys())
-  maparray = np.zeros(int(maxlabel+1), dtype=np.uint32)
+  maparray = np.zeros(int(maxlabel+1))
   mapinv = {}
   for k,v in mapping.items():
     maparray[k] = v
     mapinv[v] = k
-  lab2 = relabel_img(lab, maparray)
+  lab2 = maparray[lab.flat].reshape(lab.shape)
   return lab2, mapinv
 
 def denseQ(lab):

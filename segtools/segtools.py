@@ -16,11 +16,6 @@ import colorsys
 from numba import jit
 from skimage import measure
 
-from src import lib
-
-import sys
-sys.path.insert(0, "/Users/colemanbroaddus/Desktop/Projects/nucleipix/")
-
 # or get it from scipy.ndimage.morphology import generate_binary_structure
 structure = [[1,1,1], [1,1,1], [1,1,1]] # this is the structure that was used by Benoit & Carine!
 
