@@ -142,8 +142,8 @@ def precision(lab_gt, lab):
   """
   precision = TP / (TP + FP + FN) i.e. "intersection over union" for a graph matching
   """
-  psg = segtools_simple.pixel_sharing_bipartite(lab_gt, lab)
-  matching = segtools_simple.matching_iou(psg, fraction=0.5)
+  psg = pixel_sharing_bipartite(lab_gt, lab)
+  matching = matching_iou(psg, fraction=0.5)
   assert matching.sum(0).max() < 2
   assert matching.sum(1).max() < 2
   n_gt  = len(set(np.unique(lab_gt)) - {0})
@@ -161,14 +161,20 @@ def matching_sets(lab_gt, lab):
   return s1,s2,s1c,s2c
 
 def matching_maps(lab_gt, lab):
-  psg = segtools_simple.pixel_sharing_bipartite(lab_gt, lab)
-  matching = segtools_simple.matching_iou(psg, fraction=0.5)
+  psg = pixel_sharing_bipartite(lab_gt, lab)
+  matching = matching_iou(psg, fraction=0.5)
   assert matching.sum(0).max()<2
   assert matching.sum(1).max()<2
-  map1, map2 = segtools_simple.maps_from_matching(matching)
+  map1, map2 = maps_from_matching(matching)
   return map1, map2
 
 def matching_masks(lab_gt, lab):
+  """
+  mask1 = objects in gt that match to lab
+  mask2 = objects in lab that match to gt
+  mask1c = objects in gt that DONT match to lab
+  mask1c = objects in lab that DONT match to gt
+  """
   s1,s2,s1c,s2c = matching_sets(lab_gt, lab)
   mask1  = lib.mask_labels(s1, lab_gt)
   mask2  = lib.mask_labels(s2, lab)

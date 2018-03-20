@@ -23,7 +23,8 @@ import main.drawing as drawing
 # import main.graph_builder2 as graph_builder
 import main.voronoi as voronoi
 
-from . import seg_sasha
+from . import segtools_simple
+from . import color
 from . import loc_utils as utils
 from . import cell_view_lib as view
 
@@ -705,7 +706,7 @@ def var_thresh(pimg, lab1, t2):
       return t2
   cmap = {n['label'] : f(n['max_intensity']) for n in nhl}
   cmap[0] = 1.0
-  l1_max,_ = seg_sasha.apply_scalar_mapping(lab1, cmap)
+  l1_max = color.apply_mapping(lab1, cmap)
   m2 = pimg > l1_max
   return m2
 
