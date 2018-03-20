@@ -1,11 +1,12 @@
 ## Additional Matplotlib and Spimagine functionality
-import seaborn as sns
 import numpy as np
 import matplotlib
-# matplotlib.use('Qt5Agg')
+matplotlib.use('Qt5Agg')
+import seaborn as sns
 import matplotlib.pyplot as plt
 from matplotlib.widgets import LassoSelector
 from matplotlib.path import Path
+plt.ion()
 
 import spimagine
 import sys
@@ -92,63 +93,6 @@ def press_gen(fig, img):
             print(img[yi, xi])
     return press
 
-def mod_color_hypimg(hyp):
-    """
-    give a hypothesis image
-    return an image with values meant for spimagine display
-    when plotting labels. Remember to keep a mask of the zero-values before you mod. Then reset zeros to zero after adding 2x the mod value.
-    """
-    hyp2 = hyp.copy()
-    mask = hyp2==0
-    hyp2 %= 9
-    hyp2 += 5
-    hyp2[mask] = 0
-    return hyp2
-
-def ax_scatter_data(ax, data, **kwargs):
-  """
-  matplotlib scatterplot, but you can use a list of dicts
-  most common labels are plotted first, (underneath).
-  """
-  xs  = np.array([d['x'] for d in data])
-  ys  = np.array([d['y'] for d in data])
-  cs  = np.array([d['c'] for d in data])
-  szs = np.array([d['s'] for d in data])
-  labels = np.array([d['l'] for d in data])
-
-  print(kwargs)
-  
-  # sort labels from most to least frequent
-  labelset, labelcts = np.unique(labels, return_counts=True)
-  inds = np.argsort(labelcts)
-
-  for l in labelset[inds][::-1]:
-    mask = labels==l
-    ax.scatter(xs[mask], ys[mask], s=szs[mask], c=cs[mask], label=l, **kwargs)
-
-def ax_scatter_plus(ax, xs, ys, cs, labels, szs):
-  """
-  matplotlib scatterplot, but you can use a list of labels
-  most common labels are plotted first, (underneath).
-  """
-  xs = np.array(xs)
-  ys = np.array(ys)
-  cs = np.array(cs)
-  szs = np.array(szs)
-
-  # sort labels from most to least frequent
-  labels = np.array(labels)
-  labelset, labelcts = np.unique(labels, return_counts=True)
-  inds = np.argsort(labelcts)
-  
-  for l in labelset[inds][::-1]:
-    mask = labels==l
-    ax.scatter(xs[mask], ys[mask], s=szs[mask], c=cs[mask], label=l)
-
-def curate_widget(state):
-    fig = state['fig']
-    zcur = state['zcur']
-
 def comboview(img3d, axis=0, hyp=None, tform=None):
     # axis x,y,z = 2,1,0
     # show 2d and 3d views
@@ -228,65 +172,6 @@ def comboview(img3d, axis=0, hyp=None, tform=None):
     cid = fig.canvas.mpl_connect('button_press_event', click_genf)
     # cid = fig.canvas.mpl_connect('key_press_event', press)
     return fig, w
-
-def moveit(w):
-    dm = w.glWidget.dataModel
-    auto = True
-    auto_percentile = 100.0
-    alphas = [0, 0.25, 0.5, 0.75, 1.0]
-    alpha_i = 0
-    while True:
-        cmd = input("Command: ")
-        if cmd=='q':
-            break
-        elif cmd=='x':
-            # quatRot = spimagine.Quaternion(0.5,-0.5,0.5,0.5)
-            w.transform.addRotation(np.pi*0.25, 1., 0., 0.)
-        elif cmd=='y':
-            w.transform.addRotation(np.pi*0.25, 0., 1., 0.)
-        elif cmd=='z':
-            w.transform.addRotation(np.pi*0.25, 0., 0., 1.)
-        elif cmd=='reset':
-            # quatRot = spimagine.Quaternion(0.5,-0.5,0.5,0.5)
-            w.transform.setRotation(0, 1., 0., 0.)
-        elif cmd=='l':
-            p = w.transform.toTransformData().dataPos
-            if p<dm.size()[0]-1:
-                w.transform.setPos(p+1)
-                if auto:
-                    val = np.percentile(dm[p+1], auto_percentile)
-                    w.transform.setMax(val)
-        elif cmd=='h':
-            p = w.transform.toTransformData().dataPos
-            if p >= 1:
-                w.transform.setPos(p-1)
-                if auto:
-                    val = np.percentile(dm[p-1], auto_percentile)
-                    w.transform.setMax(val)
-        elif cmd=='a':
-            tr = w.transform.toTransformData()
-            alpha_i += 1
-            alpha_i %= len(alphas)
-            tr.alphaPow = alphas[alpha_i]
-            # tr.alphaPow %= 1.0
-            w.transform.fromTransformData(tr)
-        elif cmd=='t':
-            tr = w.transform.toTransformData()
-            print(tr)
-        elif cmd=='p':
-            p = w.transform.isPerspective
-            w.transform.setPerspective(not p)
-        elif cmd=='c':
-            print(w.transform.maxVal)
-        elif cmd[0]=='c':
-            tr = w.transform.toTransformData()
-            tr.maxVal = float(cmd[2:])
-            w.transform.fromTransformData(tr)
-        elif cmd=='auto off':
-            auto = False
-        elif cmd[:4]=='auto':
-            auto = True
-            auto_percentile = float(cmd[6:])
 
 def curate_2imgs(img3d, pimg3d):
     # show 2d and 3d views
@@ -572,16 +457,3 @@ class SelectFromCollection(object):
         self.fc[:, -1] = 1
         self.collection.set_facecolors(self.fc)
         self.canvas.draw_idle()
-
-def lineplot(img):
-    pal = sns.diverging_palette(255, 133, l=60, n=7, center="dark")
-    sns.set_palette(pal)
-    a,b,c = img.shape
-    lines = img[a//2, ::100].reshape(-1, c)
-    fig = plt.figure()
-    ax = fig.gca()
-    for l in lines:
-        ax.plot(l)
-    ax2 = fig.add_axes([0.23, 0.50, 0.3, 0.3])
-    ax2.imshow(img.max(0))
-

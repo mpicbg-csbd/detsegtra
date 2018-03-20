@@ -84,32 +84,11 @@ def matching_max(psg):
   return matching
 
 @jit
-def pixel_sharing_bipartite(img1, img2):
-  """
-  returns an ndarray representing a bipartite graph with pixel overlap count as the edge weight.
-  img1 and img2 must be same shape, and label (int) images.
-  """
-  img1 = img1.astype(np.int64)
-  img2 = img2.astype(np.int64)
-  l1max = int(img1.max()+1)
-  l2max = int(img2.max()+1)
-  if img1.ndim==2:
-      imgs = np.stack((img1, img2), axis=2)
-      psg = np.zeros((l1max, l2max), dtype=np.uint32)
-      a,b,c = imgs.shape
-      for i in range(a):
-          for j in range(b):
-              psg[imgs[i,j,0], imgs[i,j,1]] += 1
-      return psg
-  elif img1.ndim==3:
-      imgs = np.stack((img1, img2), axis=3)
-      psg = np.zeros((l1max, l2max), dtype=np.uint32)
-      a,b,c,d = imgs.shape
-      for i in range(a):
-          for j in range(b):
-              for k in range(c):
-                  psg[imgs[i,j,k,0], imgs[i,j,k,1]] += 1
-      return psg
+def pixel_sharing_bipartite(lab1, lab2):
+  psg = np.zeros((lab1.max()+1, lab2.max()+1), dtype=np.int)
+  for i in range(lab1.size):
+    psg[lab1.flat[i], lab2.flat[i]] += 1
+  return psg
 
 def denseQ(lab):
   return set(np.arange(lab.min(), lab.max()+1)) - set(np.unique(lab))

@@ -56,7 +56,6 @@ def voronoi_kd(coords, imshape, maxdist=20):
         idximg[mask] = 0
     return idximg, distimg
 
-@Incomplete
 def identify_neibs(lab):
     """
     TODO: should be able to go back and forth between binary structure and list of pixel neighbors
@@ -65,6 +64,7 @@ def identify_neibs(lab):
     neibs = np.indices(bs.shape)
     l = [v-[1,1,1] for v in neibs.reshape(3,-1).T if bs[v[0],v[1],v[2]]==1]
     l = np.array(l)
+    return l
 
 def label_boundaries_from_direction3d(lab, vec):
     a,b,c = vec
