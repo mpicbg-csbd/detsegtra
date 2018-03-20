@@ -9,10 +9,8 @@ import numpy as np
 import skimage.io as io
 from scipy.ndimage import label
 
-import gputools
-
 from . import lib
-from . import segtools
+
 
 def jaccard_color(img, mn=0.5):
   cmap = plt.get_cmap('viridis')
@@ -34,11 +32,6 @@ def rmsmall(hyp, minsize=27):
   small = [n for n in nhl if n['area'] < minsize]
   mask = lib.mask_nhl(small, hyp)
   hyp[mask] = 0
-
-# def ratio2(hyp, hyp_gt):
-#   "compure the matching score for a single hypothesis image. minsize filters out small nuclei."
-#   res = segtools.stats_seg_matching(hyp_gt, hyp)
-#   return res['stats']['ratio_2']
 
 def colorit(hyp, res, hyp_gt):
   hyp = hyp.copy()

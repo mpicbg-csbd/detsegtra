@@ -1,14 +1,11 @@
-
-# first build coords
-
 import numpy as np
+
 import scipy.spatial as spatial
 from pykdtree.kdtree import KDTree as pyKDTree
 from skimage import measure
-from . import drawing
-from scipy.ndimage.morphology import generate_binary_structure
+import scipy.ndimage as nd
 from numba import jit
-import itertools
+
 
 def voronoi3d(coords, dmax=20):
     # dlny = spatial.Delaunay(coords[:,[0,1]])
@@ -59,11 +56,12 @@ def voronoi_kd(coords, imshape, maxdist=20):
         idximg[mask] = 0
     return idximg, distimg
 
+@Incomplete
 def identify_neibs(lab):
     """
     TODO: should be able to go back and forth between binary structure and list of pixel neighbors
     """
-    bs = generate_binary_structure(3,1)
+    bs = nd.generate_binary_structure(3,1)
     neibs = np.indices(bs.shape)
     l = [v-[1,1,1] for v in neibs.reshape(3,-1).T if bs[v[0],v[1],v[2]]==1]
     l = np.array(l)
@@ -111,27 +109,18 @@ def label_neighbors(lab, ndim=2):
         hist[(l1,l2)] = count+1
     return hist
 
-def lab2binary_neibs2d(lab):
+def lab2binary_neibs(lab):
     res = lab.copy().astype(np.int)
     m1  = lab[1:, :] == lab[:-1, :]
     m2  = lab[:, 1:] == lab[:, :-1]
-    res[:-1]  = m1
-    res[1:]    += m1
-    res[:,1:]  += m2
-    res[:,:-1] += m2
-    return res
-
-def lab2binary_neibs3d(lab):
-    res = lab.copy().astype(np.int)
-    m1  = lab[1:, :, :] == lab[:-1, :, :]
-    m2  = lab[:, 1:, :] == lab[:, :-1, :]
-    m3  = lab[:, :, 1:] == lab[:, :, :-1]
     res[:-1] = m1
     res[1:]  += m1
     res[:,1:] += m2
     res[:,:-1] += m2
-    res[:,:,1:] += m3
-    res[:,:,:-1] += m3
+    if lab.ndim==3:
+        m3  = lab[:, :, 1:] == lab[:, :, :-1]
+        res[:,:,1:] += m3
+        res[:,:,:-1] += m3
     return res
 
 def hist2neibs(hist, pixmax=5):

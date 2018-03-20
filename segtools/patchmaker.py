@@ -1,6 +1,5 @@
 import numpy as np
 
-
 @DeprecationWarning
 def sample_patches(data, patch_size, n_samples=100, verbose=False):
     """
@@ -119,8 +118,6 @@ def piece_together(patches, coords, imgshape=None, border=0):
         res = res[:a, :b]
     return res
 
-
-
 def piece_together_ragged_2d(patches, coords):
     """
     patches is a list of ndarrays of potentially varying size.
@@ -141,3 +138,34 @@ def piece_together_ragged_2d(patches, coords):
         x,y = coords[i]
         patch_img[x:x+dx, y:y+dy] = img
     return patch_img
+
+def argmax3d(img):
+  "equivalent to divmod chaining"
+  return np.unravel_index(img.argmax(), img.shape)
+
+def patchify(img, patch_shape):
+  """
+  From StackOverflow https://stackoverflow.com/questions/16774148/fast-way-to-slice-image-into-overlapping-patches-and-merge-patches-to-image?noredirect=1&lq=1
+  eg:
+  out = patchify(x, (S,S)).max(axis=(3,4))
+  """
+  a, X, Y, b = img.shape
+  x, y = patch_shape
+  shape = (a, X - x + 1, Y - y + 1, x, y, b)
+  a_str, X_str, Y_str, b_str = img.strides
+  strides = (a_str, X_str, Y_str, X_str, Y_str, b_str)
+  return np.lib.stride_tricks.as_strided(img, shape=shape, strides=strides)
+
+def sub_block_apply(func, img, sub_blocks=(1,1,1)):
+  a,b,c = img.shape
+  n1, n2, n3 = sub_blocks
+  ar = list(range(0, a+1, a//n1)); ar[-1]=None
+  br = list(range(0, b+1, b//n2)); br[-1]=None
+  cr = list(range(0, c+1, c//n3)); cr[-1]=None
+  res = np.zeros_like(img)
+  for i in range(n1):
+    for j in range(n2):
+      for k in range(n3):
+        ss = (slice(ar[i], ar[i+1]), slice(br[j], br[j+1]), slice(cr[k], cr[k+1]))
+        res[ss] = func(img[ss])
+  return res
