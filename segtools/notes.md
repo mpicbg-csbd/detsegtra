@@ -39,3 +39,10 @@ It's currently in voronoi, but it could be in segtools_simple (which should prob
 
 - Can we turn pathfinder into a numba program?
 - Is it simple to build ndtess and incorporate pybind11?
+
+# What scores to add to segtools_simple?
+
+- RAND
+- Warping error
+- Tolerant Edit Distance
+
