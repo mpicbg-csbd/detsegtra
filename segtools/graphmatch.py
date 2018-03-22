@@ -83,42 +83,54 @@ def centerpoint_in_seg_bipartite(hyp_gt, hyp_seg, coords_gt, coords_seg, gtlabel
   bipartite = matrix2bip(bipartite, gtlabels, seglabels)
   return bipartite
 
-def centroid_bipartite(coords_gt, coords_seg, l1='gt_', l2='seg_', labels_gt=None, labels_seg=None, k=7, dub=10):
+def bipartite_connection_symmetric(x, y, **kwargs):
   """
   Build a bipartite from two point clouds with edges between
   all points within cutoff radius.
   coords are (n,m) arrays. each arr[i,:] is a vec in arbitrary feature space.
   distance between points is euclidean.
   """
-
-  def kdmatch(x,y):
-    kdt = pyKDTree(y)
-    dists, inds = kdt.query(x, k=k, distance_upper_bound=dub)
-    return inds
-
-  indices_gt2seg = kdmatch(coords_gt, coords_seg)
-  indices_seg2gt = kdmatch(coords_seg, coords_gt)
-
-  if labels_gt is None:
-    labels_gt = np.arange(coords_gt.shape[0])
-  if labels_seg is None:
-    labels_seg = np.arange(coords_seg.shape[0])
-
-  labels_gt  = np.concatenate([labels_gt, [-1]])
-  labels_seg = np.concatenate([labels_seg, [-1]])
-
-  labels_gt2seg = {}
-  labels_seg2gt = {}
-  for i,vs in enumerate(indices_gt2seg):
-    labels_gt2seg[(l1, labels_gt[i])] = [(l2, v) for v in labels_seg[vs] if v!=-1]
-  for i,vs in enumerate(indices_seg2gt):
-    labels_seg2gt[(l2, labels_seg[i])] = [(l1, v) for v in labels_gt[vs] if v!=-1]
-
-  g1 = nx.from_dict_of_lists(labels_gt2seg)
-  g2 = nx.from_dict_of_lists(labels_seg2gt)
+  map_x2y = x2y_labelmap(x, y, **kwargs)
+  map_y2x = x2y_labelmap(y, x, **kwargs)
+  g1 = nx.from_dict_of_lists(map_x2y)
+  g2 = nx.from_dict_of_lists(map_y2x)
   g3 = nx.compose(g1, g2)
-  
   return g3
+
+def bipartite_connection_digraph_symmetric(x, y, **kwargs):
+  map_x2y = x2y_labelmap(x, y, **kwargs)
+  map_y2x = x2y_labelmap(y, x, **kwargs)
+  g1 = nx.from_dict_of_lists(map_x2y, nx.DiGraph())
+  g2 = nx.from_dict_of_lists(map_y2x, nx.DiGraph())
+  g2 = g2.reverse()
+  g3 = nx.compose(g1, g2)
+  return g
+
+def bipartite_connection_digraph(x, y, **kwargs):
+  map_x2y = x2y_labelmap(x, y, **kwargs)
+  assert False
+  g1 = nx.from_dict_of_lists(map_x2y, nx.DiGraph())
+  return g1
+
+def kdmatch(x,y,k=7,dub=100):
+  kdt = pyKDTree(y)
+  dists, inds = kdt.query(x, k=k, distance_upper_bound=dub)
+  return inds
+
+def x2y_labelmap(x, y, lx='x', ly='y', labels_x=None, labels_y=None, **kwargs):
+  if labels_x is None:
+    labels_x = np.arange(x.shape[0])
+  if labels_y is None:
+    labels_y = np.arange(y.shape[0])
+
+  indices_x2y = kdmatch(x, y, **kwargs)
+  labels_x  = np.concatenate([labels_x, [-1]])
+  labels_y  = np.concatenate([labels_y, [-1]])
+  labels_x2y = {}
+  for i,vs in enumerate(indices_x2y):
+    labels_x2y[(lx, labels_x[i])] = [(ly, v) for v in labels_y[vs] if v!=-1]
+  return labels_x2y
+
 
 @DeprecationWarning
 def psg_bipartite(hyp_gt, hyp_seg):
