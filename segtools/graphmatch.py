@@ -3,19 +3,19 @@ import networkx as nx
 import numpy as np
 from numba import jit
 from skimage import measure
-from loc_utils import list2dist
+from .loc_utils import list2dist
 
 """
 This module works with networkx-based bipartite graphs and matchings
 """
     
 def get_centroids(hyp):
-    rps = measure.regionprops(hyp)
-    coords = [np.mean(rp.coords, axis=0) for rp in rps]
-    coords = np.array(coords)
-    labels = [rp['label'] for rp in rps]
-    labels = np.array(labels)
-    return coords, labels
+  rps = measure.regionprops(hyp)
+  coords = [np.mean(rp.coords, axis=0) for rp in rps]
+  coords = np.array(coords)
+  labels = [rp['label'] for rp in rps]
+  labels = np.array(labels)
+  return coords, labels
 
 def match2map(bipartite, matching, from_x='gt_', to_y='seg_'):
   """
@@ -67,23 +67,23 @@ def psg2nx(psg):
 ## ---- useful bipartite graphs ----
 
 def centerpoint_in_seg_bipartite(hyp_gt, hyp_seg, coords_gt, coords_seg, gtlabels, seglabels):
-    a,b = int(hyp_gt.max()), int(hyp_seg.max())
-    bipartite = np.zeros((a+1,b+1), dtype=np.int)
+  a,b = int(hyp_gt.max()), int(hyp_seg.max())
+  bipartite = np.zeros((a+1,b+1), dtype=np.int)
 
-    inds = coords_gt.astype(np.int)
-    if inds.shape!=(0,):
-      gt2seglabel = hyp_seg[tuple(inds.T)]
-      bipartite[gtlabels, gt2seglabel] = 1
+  inds = coords_gt.astype(np.int)
+  if inds.shape!=(0,):
+    gt2seglabel = hyp_seg[tuple(inds.T)]
+    bipartite[gtlabels, gt2seglabel] = 1
 
-    inds = coords_seg.astype(np.int)
-    if inds.shape!=(0,):
-      seg2gtlabel = hyp_gt[tuple(inds.T)]
-      bipartite[seg2gtlabel, seglabels] = 1
-    
-    bipartite = matrix2bip(bipartite, gtlabels, seglabels)
-    return bipartite
+  inds = coords_seg.astype(np.int)
+  if inds.shape!=(0,):
+    seg2gtlabel = hyp_gt[tuple(inds.T)]
+    bipartite[seg2gtlabel, seglabels] = 1
+  
+  bipartite = matrix2bip(bipartite, gtlabels, seglabels)
+  return bipartite
 
-def centroid_bipartite(coords_gt, coords_seg, labels_gt=None, labels_seg=None, k=7, dub=10):
+def centroid_bipartite(coords_gt, coords_seg, l1='gt_', l2='seg_', labels_gt=None, labels_seg=None, k=7, dub=10):
   """
   Build a bipartite from two point clouds with edges between
   all points within cutoff radius.
@@ -93,15 +93,15 @@ def centroid_bipartite(coords_gt, coords_seg, labels_gt=None, labels_seg=None, k
 
   def kdmatch(x,y):
     kdt = pyKDTree(y)
-    dists, inds = kdt.query(x, k=k, dub=dub)
+    dists, inds = kdt.query(x, k=k, distance_upper_bound=dub)
     return inds
 
   indices_gt2seg = kdmatch(coords_gt, coords_seg)
   indices_seg2gt = kdmatch(coords_seg, coords_gt)
 
-  if not labels_gt:
+  if labels_gt is None:
     labels_gt = np.arange(coords_gt.shape[0])
-  if not labels_seg:
+  if labels_seg is None:
     labels_seg = np.arange(coords_seg.shape[0])
 
   labels_gt  = np.concatenate([labels_gt, [-1]])
@@ -110,9 +110,9 @@ def centroid_bipartite(coords_gt, coords_seg, labels_gt=None, labels_seg=None, k
   labels_gt2seg = {}
   labels_seg2gt = {}
   for i,vs in enumerate(indices_gt2seg):
-    labels_gt2seg[('gt_', labels_gt[i])] = [('seg_', v) for v in labels_seg[vs] if v!=-1]
+    labels_gt2seg[(l1, labels_gt[i])] = [(l2, v) for v in labels_seg[vs] if v!=-1]
   for i,vs in enumerate(indices_seg2gt):
-    labels_seg2gt[('seg_', labels_seg[i])] = [('gt_', v) for v in labels_gt[vs] if v!=-1]
+    labels_seg2gt[(l2, labels_seg[i])] = [(l1, v) for v in labels_gt[vs] if v!=-1]
 
   g1 = nx.from_dict_of_lists(labels_gt2seg)
   g2 = nx.from_dict_of_lists(labels_seg2gt)
@@ -122,24 +122,24 @@ def centroid_bipartite(coords_gt, coords_seg, labels_gt=None, labels_seg=None, k
 
 @DeprecationWarning
 def psg_bipartite(hyp_gt, hyp_seg):
-    psg = pixel_sharing_bipartite(hyp_gt, hyp_seg)
-    # bipartite = array2weightedbip(psg, labels_gt, labels_seg, w='psg')
-    bipartite = {}
-    areas = {}
-    labels_gt = np.arange(hyp_gt.max() + 1, dtype=np.int)
-    labels_seg = np.arange(hyp_seg.max() + 1, dtype=np.int)
-    for l1 in labels_gt:
-        a = psg[l1,:].sum()
-        if a > 0:
-          areas[('gt_', l1)] = a
-          bipartite[('gt_', l1)] = {('seg_', l2) : {'overlap' : psg[l1,l2]} for l2 in labels_seg if psg[l1,l2] > 0}
-    for l2 in labels_seg:
-        a = psg[:,l2].sum()
-        if a > 0:
-          areas[('seg_', l2)] = a
-    g = nx.from_dict_of_dicts(bipartite)
-    nx.set_node_attributes(g, 'area', areas)
-    return g
+  psg = pixel_sharing_bipartite(hyp_gt, hyp_seg)
+  # bipartite = array2weightedbip(psg, labels_gt, labels_seg, w='psg')
+  bipartite = {}
+  areas = {}
+  labels_gt = np.arange(hyp_gt.max() + 1, dtype=np.int)
+  labels_seg = np.arange(hyp_seg.max() + 1, dtype=np.int)
+  for l1 in labels_gt:
+      a = psg[l1,:].sum()
+      if a > 0:
+        areas[('gt_', l1)] = a
+        bipartite[('gt_', l1)] = {('seg_', l2) : {'overlap' : psg[l1,l2]} for l2 in labels_seg if psg[l1,l2] > 0}
+  for l2 in labels_seg:
+      a = psg[:,l2].sum()
+      if a > 0:
+        areas[('seg_', l2)] = a
+  g = nx.from_dict_of_dicts(bipartite)
+  nx.set_node_attributes(g, 'area', areas)
+  return g
 
 ## ---- matchings from bipartites ----
 
@@ -169,13 +169,13 @@ def match_stats(nx_bipartite, matching, from_x='gt_', to_y='seg_'):
   return summary
 
 def unique_matching(bipartite):
-    match = {}
-    deg = bipartite.degree()
-    for v,u in bipartite.edges_iter():
-        if deg[v]==deg[u]==1:
-            match[v]=u
-            match[u]=v
-    return match
+  match = {}
+  deg = bipartite.degree()
+  for v,u in bipartite.edges_iter():
+      if deg[v]==deg[u]==1:
+          match[v]=u
+          match[u]=v
+  return match
 
 def weighted_bipartite2matching(bipartite, func):
   match = {}
@@ -188,9 +188,6 @@ def weighted_bipartite2matching(bipartite, func):
       if ov/a1 >= 0.5 and ov/a2 >= 0.5:
         match[v] = e
   return match
-
-
-
 
 ## maximum matching with nx.bipartite.maximum_matching
 

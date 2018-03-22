@@ -24,7 +24,6 @@ from . import loc_utils
 from . import cell_view_lib as view
 
 
-
 @DeprecationWarning
 def pixel_confusion(pimg, labelimg, threshold):
   """
@@ -70,17 +69,17 @@ def hyp2nhl_2d(hyp, img=None, time=None, simple=False):
 
   def f(rp):
     coords = np.mean(rp.coords, axis=0).tolist()
-    minz,miny,minx,maxz,maxy,maxx = rp.bbox
-    crop = hyp[minz:maxz, miny:maxy, minx:maxx].copy()
+    miny,minx,maxy,maxx = rp.bbox
+    crop = hyp[miny:maxy, minx:maxx].copy()
     crop = crop==rp.label
     # mu1 = moments_central(crop, [0,0,0], 1)
     # print(mu1)
     # sm = mu1[0,0,0]
     # local_center = [mu1[1,0,0]/sm, mu1[0,1,0]/sm, mu1[0,0,1]/sm]
-    local_center = [coords[0]-minz, coords[1]-miny, coords[2]-minx]
+    local_center = [coords[0]-miny, coords[1]-minx]
     # local_centroid = rp.local_centroid
-    mu = math_utils.moments_central(crop, map(int, local_center), 2)
-    sig = math_utils.inertia_tensor(mu)
+    mu = rp.moments_central #math_utils.moments_central(crop, map(int, local_center), 2)
+    sig = rp.inertia_tensor #math_utils.inertia_tensor(mu)
     eigvals, eigvecs = np.linalg.eig(sig)
     features = {'label'   : rp.label,
                 'area'    : int(rp.area),
@@ -93,6 +92,8 @@ def hyp2nhl_2d(hyp, img=None, time=None, simple=False):
     if simple:
       return features
     
+    # assert False
+
     extra = {'moments_hyp' : mu,
              'eigvals_hyp' : eigvals,
              'eigvecs_hyp' : eigvecs, }
@@ -100,9 +101,10 @@ def hyp2nhl_2d(hyp, img=None, time=None, simple=False):
     features = {**features, **extra}
 
     if img is not None:
-      crop_img = img[minz:maxz, miny:maxy, minx:maxx].copy()
+      crop_img = img[miny:maxy, minx:maxx].copy()
       crop_img[~crop] = 0
-      mu2 = math_utils.moments_central(crop_img, map(int, local_center), 2)
+      # mu2 = math_utils.moments_central(crop_img, map(int, local_center), 2)
+      mu2 = rp.moments_central
       # print(mu2, type(mu2))
       features['moments_img']   = mu2
       # print(rp.max_intensity, type(rp.max_intensity))
@@ -366,6 +368,24 @@ def two_var_thresh(pimg, c1=0.5, c2=0.9):
   # hyp = nd.label(pimg>0.3)[0]
   nhl  = hyp2nhl(hyp, pimg)
   return nhl, hyp
+
+def spectral_clustering_seg(img, n_clusters=8, threshold=150):
+    """
+    uses spectral clustering on pixel graph to split connected components.
+    only included here for posterity
+    shitty method for nuclei. also very slow. img is uint16? HypothesisImage.
+    """
+    from sklearn.feature_extraction.image import img_to_graph
+    from sklearn.cluster import spectral_clustering
+    bimg = gputools.blur(img)
+    plt.imshow(bimg)
+    mask=bimg>threshold
+    graph = img_to_graph(bimg, mask=mask)
+    graph.data = np.exp(-graph.data/graph.data.std())
+    labels = spectral_clustering(graph, n_clusters=8)
+    labelsim = np.zeros(bimg.shape)
+    labelsim[mask] = labels
+    return labelsim
 
 @DeprecationWarning
 def pimg2hyp(pimg, th, bl=1.0, minsize=34, maxsize=None, minfilter=0):

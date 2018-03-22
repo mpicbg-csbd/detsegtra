@@ -21,7 +21,6 @@ def get_slices_from_transform(img, tcube):
     slt = slice(zmin, zmax), slice(ymin, ymax), slice(xmin, xmax)
     return slt
 
-
 def transform2slices(trans, shape):
     """
     specify a spimagine.TransformData and full-sized image
@@ -37,7 +36,6 @@ def transform2slices(trans, shape):
     zmax = int((1 + trans.bounds[5])*zhw)
     slt = slice(zmin, zmax), slice(ymin, ymax), slice(xmin, xmax)
     return slt
-
 
 def get_cube_from_transform(img, tcube):
     """
@@ -94,11 +92,9 @@ def curate_nhl(w, nhl, img, hyp, pp):
             i += 1
     return biganno
 
-
 def update_spim(w, i, cube):
     w.glWidget.dataModel[i][...] = cube
     w.glWidget.dataPosChanged(i)
-
 
 def mk_quat(m):
     "this is the boundary from our data (z,y,x) indicies. To spimagine data: (x,y,z) inds."
@@ -169,3 +165,25 @@ def moveit(w):
         elif cmd[:4] == 'auto':
             auto = True
             auto_percentile = float(cmd[6:])
+
+
+def render_rgb_still(hypRGB, w=None, transform=None, fname="sceneRGB.png"):
+    if w is None:
+        w = spimagine.volshow(hypRGB[...,0], interpolation='nearest', cmap='grays', raise_window=False)
+    
+    if transform:
+        w.transform.fromTransformData(transform)
+    
+    update_spim(w,0,hypRGB[...,0])
+    w.saveFrame('img0.png')
+    update_spim(w,0,hypRGB[...,1])
+    w.saveFrame('img1.png')
+    update_spim(w,0,hypRGB[...,2])
+    w.saveFrame('img2.png')
+    
+    chan1 = io.imread('img0.png')[...,0]
+    chan2 = io.imread('img1.png')[...,0]
+    chan3 = io.imread('img2.png')[...,0]
+    flat  = np.stack((chan1, chan2, chan3), axis=-1)
+    io.imsave(fname, flat)
+    return 

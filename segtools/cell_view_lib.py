@@ -305,6 +305,104 @@ class ImshowStack(object):
         self.autocolor = True
         self.w = w
 
+class Stack(object):
+    """
+    Quick and dirty viewer for ndarrays with ndim>2.
+    Hold down the number of the dimension you want to cycle, eg '1', '2', ...
+    Move forwards/backwards with k/j
+    'F' = Faster
+    'S' = Slower
+    'A' = toggle auto contrast
+    """
+    def press(self, event):
+        sys.stdout.flush()
+        if event.key == 'i': # Up
+            dimlen = self.stack.shape[self.zdim]
+            pt = self.idx[self.zdim]
+            if dimlen > 10:
+                pt += 1*self.mul
+            else:
+                pt += 1
+            pt %= dimlen
+            self.idx[self.zdim] = pt
+        elif event.key == 'j': # Down
+            dimlen = self.stack.shape[self.zdim]
+            pt = self.idx[self.zdim]
+            if dimlen > 10:
+                pt -= 1*self.mul
+            else:
+                pt -= 1
+            pt %= dimlen
+            self.idx[self.zdim] = pt
+        elif event.key in {'1', '2', '3'}:
+            self.zdim = int(event.key)-1
+        elif event.key == 'F': # Faster
+            self.mul += 1
+        elif event.key == 'S': # Slower
+            self.mul -= 1
+        elif event.key == 'A':
+            self.autocolor = not self.autocolor
+        elif event.key == 'V':
+            assert False
+        # elif event.key == 'W':
+        #     self.w = int(input('gimme a w: '))
+        
+        if self.autocolor:
+            img = self.stack[tuple(self.idx)]
+            mn, mx = img.min(), img.max()
+            self.fig.gca().images[0].set_clim(mn, mx)
+            print(mn, mx)
+
+        print('idx:', self.idx, 'zdim:', self.zdim, 'mul:', self.mul, 'autocolor:', self.autocolor)
+        
+        if self.w > 0:
+            zpos = self.idx[1]
+            # a = max(zpos-self.w, 0)
+            b = min(zpos+self.w, self.stack.shape[1])
+            ss = list(self.idx)
+            ss[1] = slice(zpos, b)
+            data = self.stack[tuple(ss)]
+            if decay:
+                decay = np.exp(-np.arange(data.shape[0])/2).reshape((-1,1,1))
+                data = (data*decay).mean(0)
+        else:
+            ss = tuple(self.idx)
+            data = self.stack[ss]
+        
+        self.fig.gca().images[0].set_data(data)
+        self.fig.canvas.draw()
+
+    def __init__(self, stack, customclick=None, colorchan=False, w=0, decay=False, norm=True):
+        if type(stack)==list:
+            stack = np.stack(stack).astype(np.float)
+            print(stack.dtype)
+        self.zdim = 0
+        # TODO: this will give a bug when we have 3channel color imgs.
+            
+        if colorchan:
+            if stack.shape[-1]==2:
+                stack = np.stack([stack[...,0], 0.5*stack[...,1], 0.5*stack[...,1]], axis=-1)
+            self.idx = np.array([0]*(stack.ndim-3))
+            self.ndim = stack.ndim-3
+        else:
+            self.idx = np.array([0]*(stack.ndim-2))
+            self.ndim = stack.ndim-2
+        self.stack = stack
+        # self.overlay = np.zeros(stack.shape[-3:] + (4,), dtype='float')
+        # self.overlay[:100, :50] = 4
+        # self.overlay[100:, :50] = 1
+
+        fig = imshowme(stack[tuple(self.idx)])
+        
+        fig.canvas.mpl_connect('key_press_event', self.press)
+        # fig.gca().imshow(self.overlay[self.idx[-1]])
+
+        print(fig, self.idx)
+        self.fig = fig
+        self.mul = 1
+        self.autocolor = True
+        self.w = w
+
 class ImEditStack(object):
     def press(self, event):
         sys.stdout.flush()

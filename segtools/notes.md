@@ -46,3 +46,24 @@ It's currently in voronoi, but it could be in segtools_simple (which should prob
 - Warping error
 - Tolerant Edit Distance
 
+
+# How should we incorporate the remaining parts of cell_tracker?
+
+- cell_tracker is mostly obsolete.
+    - we have much better methods for segmentation now
+    - we have much richer feature space for object hypotheses
+    - we have richer ways of connecting objects into bi/multi-partite graphs
+    - we can use pulp instead of rolling our own modeling language
+        + don't need to write and parse LP files!
+        + still a backend-independent solution
+    - much of cell_tracker has already been incorporated into segtools
+        + voronoi
+        + curation
+        + etc
+
+
+
+# bugs
+
+- can't scale properly with view.Stack or view.ImShowStack in Qt5Agg backend
+- 
