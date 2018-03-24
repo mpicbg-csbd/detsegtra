@@ -83,7 +83,7 @@ def centerpoint_in_seg_bipartite(hyp_gt, hyp_seg, coords_gt, coords_seg, gtlabel
   bipartite = matrix2bip(bipartite, gtlabels, seglabels)
   return bipartite
 
-def bipartite_connection_symmetric(x, y, **kwargs):
+def connect_points_symmetric(x, y, **kwargs):
   """
   Build a bipartite from two point clouds with edges between
   all points within cutoff radius.
@@ -97,18 +97,18 @@ def bipartite_connection_symmetric(x, y, **kwargs):
   g3 = nx.compose(g1, g2)
   return g3
 
-def bipartite_connection_digraph_symmetric(x, y, **kwargs):
+def connect_points_digraph_symmetric(x, y, reverse=True, **kwargs):
   map_x2y = x2y_labelmap(x, y, **kwargs)
   map_y2x = x2y_labelmap(y, x, **kwargs)
   g1 = nx.from_dict_of_lists(map_x2y, nx.DiGraph())
   g2 = nx.from_dict_of_lists(map_y2x, nx.DiGraph())
-  g2 = g2.reverse()
+  if reverse:
+    g2 = g2.reverse()
   g3 = nx.compose(g1, g2)
   return g
 
-def bipartite_connection_digraph(x, y, **kwargs):
+def connect_points_digraph(x, y, **kwargs):
   map_x2y = x2y_labelmap(x, y, **kwargs)
-  assert False
   g1 = nx.from_dict_of_lists(map_x2y, nx.DiGraph())
   return g1
 

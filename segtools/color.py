@@ -6,6 +6,7 @@ import colorsys
 from numba import jit
 from skimage import measure
 
+
 from . import voronoi
 
 def pastel_colors_RGB(n_colors=10, brightness=0.5, value=0.5):
@@ -83,7 +84,6 @@ def graphcolor(lab):
   labr = apply_mapping(lab, d)
   return labr
 
-
 def mod_color_hypimg(hyp):
   """
   give a hypothesis image
@@ -96,3 +96,29 @@ def mod_color_hypimg(hyp):
   hyp2 += 5
   hyp2[mask] = 0
   return hyp2
+
+def cmap_color(img, cmap='viridis', mn=None, mx=None):
+  if mn is None : mn = img.min()
+  if mx is None : mx = img.max()
+  cmap = plt.get_cmap(cmap)
+  cmap = np.array(cmap.colors)
+  rgb_img = img.copy()
+  mx = rgb_img.max()
+  rgb_img -= mn
+  rgb_img *= mx/rgb_img.max()
+  rgb_img = rgb_img.clip(min=0)
+  # mn, mx = rgb_img.min(), rgb_img.max()
+  # rgb_img = (rgb_img - mn)/(mx-mn)
+  rgb_img = (255*rgb_img).astype(np.uint8)
+  rgb_img = cmap[rgb_img.flat].reshape(rgb_img.shape + (3,))
+  return rgb_img
+
+
+def grouped_colormap(basecolors=[(1,0,0), (0,1,0)], mult=[100,100]):
+  flatten = lambda l: [item for sublist in l for item in sublist]
+  colors = flatten([[c] * m for c,m in zip(basecolors, mult)])
+  colors = np.array(colors)
+  rands = np.random.rand(sum(mult),3)
+  colors = colors + rands*0.5
+  colors = np.clip(colors, 0, 1)
+  return colors
