@@ -336,6 +336,7 @@ class Stack(object):
             self.idx[self.zdim] = pt
         elif event.key in {'1', '2', '3'}:
             self.zdim = int(event.key)-1
+            print('idx:', self.idx, 'zdim:', self.zdim, 'mul:', self.mul, 'autocolor:', self.autocolor)
         elif event.key == 'F': # Faster
             self.mul += 1
         elif event.key == 'S': # Slower
@@ -351,9 +352,9 @@ class Stack(object):
             img = self.stack[tuple(self.idx)]
             mn, mx = img.min(), img.max()
             self.fig.gca().images[0].set_clim(mn, mx)
-            print(mn, mx)
+            # print(mn, mx)
 
-        print('idx:', self.idx, 'zdim:', self.zdim, 'mul:', self.mul, 'autocolor:', self.autocolor)
+        # print('idx:', self.idx, 'zdim:', self.zdim, 'mul:', self.mul, 'autocolor:', self.autocolor)
         
         if self.w > 0:
             zpos = self.idx[1]
