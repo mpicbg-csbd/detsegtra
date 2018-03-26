@@ -2,7 +2,7 @@ import numpy as np
 from numba import jit
 
 
-# taken from stackoverflow?
+# taken from stackoverflow
 def PCA(data, dims_rescaled_data=2):
     """
     returns: data transformed in 2 dims/columns + regenerated original data
@@ -132,3 +132,14 @@ def build_kernel_nd(w, n, func):
     res = [func(x) for x in dom.reshape(n,-1).T]
     res = np.array(res).reshape(dom.shape[1:])
     return res
+
+
+def cart2pol(x, y):
+    rho = np.sqrt(x**2 + y**2)
+    phi = np.arctan2(y, x)
+    return(rho, phi)
+
+def pol2cart(rho, phi):
+    x = rho * np.cos(phi)
+    y = rho * np.sin(phi)
+    return(x, y)
