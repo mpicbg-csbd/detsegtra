@@ -62,10 +62,11 @@ def labelImg_to_rgb(img, bg_ID=1, membrane_ID=0):
 
 def apply_mapping(lab, mapping):
   maxlabel = lab.max().astype('int')
-  maparray = np.zeros(maxlabel+1, dtype=np.uint32)
+  n_channels = len(mapping[0])
+  maparray = np.zeros((maxlabel+1, n_channels))
   for k,v in mapping.items():
     maparray[k] = v
-  lab2 = maparray[lab.flat].reshape(lab.shape)
+  lab2 = maparray[lab.flat].reshape(lab.shape + (n_channels,))
   return lab2
 
 def permute(lab, perm):
@@ -122,3 +123,11 @@ def grouped_colormap(basecolors=[(1,0,0), (0,1,0)], mult=[100,100]):
   colors = colors + rands*0.5
   colors = np.clip(colors, 0, 1)
   return colors
+
+
+def make_jpegfolder_from_2drgb_stack(rgb, name='rgb'):
+  assert rgb.ndim==4
+  import os
+  os.makedirs(name)
+  for i in range(rgb.shape[0]):
+    io.imsave(name + '/' + 'rgb{:03d}.jpeg'.format(i), rgb[i])
