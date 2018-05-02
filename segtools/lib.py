@@ -182,6 +182,13 @@ def hyp2nhl(hyp, img=None, time=None, simple=False):
   nhl  = sorted(nhl, key=lambda n: n['area'])
   return nhl
 
+def labs2nhls(labs, imgs, simple=True):
+    if labs.ndim==3:
+        nhls = [seglib.hyp2nhl_2d(labs[i], imgs[i], simple=simple) for i in range(labs.shape[0])]
+    elif labs.ndim==4:
+        nhls = [seglib.hyp2nhl(labs[i], imgs[i], simple=simple) for i in range(labs.shape[0])]
+    return nhls
+
 ## operate on nhl
 
 def nhl_mnmx(nhl, prop):
