@@ -1,27 +1,23 @@
 import sys
 from copy import deepcopy
+import itertools
 
+import pandas as pd
 import numpy as np
 
 from scipy import ndimage as nd
-
+from scipy.ndimage import label
 from scipy.signal import gaussian
-
 from sklearn.mixture import GaussianMixture
-
 from skimage.morphology import watershed
 from skimage.feature import peak_local_max
 from skimage import measure
-
-import gputools
-import spimagine
 
 from . import voronoi
 from . import math_utils
 from . import segtools_simple
 from . import color
 from . import loc_utils
-from . import cell_view_lib as view
 
 
 @DeprecationWarning
@@ -67,6 +63,9 @@ def hyp2nhl_2d(hyp, img=None, time=None, simple=False):
   else:
     rps = measure.regionprops(hyp, img)
 
+  neibs = voronoi.label_neighbors(hyp)
+  tot = neibs.sum(0) + neibs.sum(1)
+
   def f(rp):
     coords = np.mean(rp.coords, axis=0).tolist()
     miny,minx,maxy,maxx = rp.bbox
@@ -84,7 +83,9 @@ def hyp2nhl_2d(hyp, img=None, time=None, simple=False):
     features = {'label'   : rp.label,
                 'area'    : int(rp.area),
                 'coords'  : coords,
-                'bbox'    : rp.bbox,}
+                'bbox'    : rp.bbox,
+                'dims'    : [maxy-miny,maxx-minx],
+                'surf'    : tot[rp.label]}
 
     if time is not None:
       features['time'] = time
@@ -128,6 +129,9 @@ def hyp2nhl(hyp, img=None, time=None, simple=False):
   else:
     rps = measure.regionprops(hyp, img)
 
+  neibs = voronoi.label_neighbors(hyp)
+  tot = neibs.sum(0) + neibs.sum(1)
+
   def f(rp):
     coords = np.mean(rp.coords, axis=0).tolist()
     minz,miny,minx,maxz,maxy,maxx = rp.bbox
@@ -137,15 +141,12 @@ def hyp2nhl(hyp, img=None, time=None, simple=False):
     # print(mu1)
     # sm = mu1[0,0,0]
     # local_center = [mu1[1,0,0]/sm, mu1[0,1,0]/sm, mu1[0,0,1]/sm]
-    local_center = [coords[0]-minz, coords[1]-miny, coords[2]-minx]
-    # local_centroid = rp.local_centroid
-    mu = math_utils.moments_central(crop, map(int, local_center), 2)
-    sig = math_utils.inertia_tensor(mu)
-    eigvals, eigvecs = np.linalg.eig(sig)
     features = {'label'   : rp.label,
                 'area'    : int(rp.area),
                 'coords'  : coords,
-                'bbox'    : rp.bbox,}
+                'bbox'    : rp.bbox,
+                'dims'    : [maxz-minz,maxy-miny,maxx-minx],
+                'surf'    : tot[rp.label]}
 
     if time is not None:
       features['time'] = time
@@ -153,6 +154,11 @@ def hyp2nhl(hyp, img=None, time=None, simple=False):
     if simple:
       return features
     
+    local_center = [coords[0]-minz, coords[1]-miny, coords[2]-minx]
+    # local_centroid = rp.local_centroid
+    mu = math_utils.moments_central(crop, map(int, local_center), 2)
+    sig = math_utils.inertia_tensor(mu)
+    eigvals, eigvecs = np.linalg.eig(sig)
     extra = {'moments_hyp' : mu,
              'eigvals_hyp' : eigvals,
              'eigvecs_hyp' : eigvecs, }
@@ -183,56 +189,64 @@ def nhl_mnmx(nhl, prop):
   a,b = max(areas), min(areas)
   return a,b
 
+def nhl2dataframe(nhl, **kwargs):
+  res = pd.DataFrame([flatten_nuc(x, **kwargs) for x in nhl])
+  return res
+
 ## operate on single nuclei
 
-def nuc2X(nuc):
-  """
-  Useful when you want to train a classifier on nuclei to predict segmentation type.
-  """
-  ar = nuc['area']
-  c0 = nuc['coords'][0]
-  c1 = nuc['coords'][1]
-  c2 = nuc['coords'][2]
-  b0 = nuc['bbox'][0]
-  b1 = nuc['bbox'][1]
-  b2 = nuc['bbox'][2]
-  # mh000 = nuc['moments_hyp'][0,0,0]
-  # mh100 = nuc['moments_hyp'][1,0,0]
-  # mh010 = nuc['moments_hyp'][0,1,0]
-  # mh001 = nuc['moments_hyp'][0,0,1]
-  # mh100 = nuc['moments_hyp'][1,0,0]
-  # mh010 = nuc['moments_hyp'][0,1,0]
-  # mh001 = nuc['moments_hyp'][0,0,1]
-  e0 = nuc['eigvals_hyp'][0]
-  e1 = nuc['eigvals_hyp'][1]
-  e2 = nuc['eigvals_hyp'][2]
-  mx = nuc['max_intensity'][0]
-  mn = nuc['min_intensity'][0]
-  ti = nuc.get('time', 0)
-  return [ar, c0, c1, c2, b0, b1, b2, e0, e1, e2, mx, mn, ti]
+def flatten_nuc(nuc, vecs=True, moments=True):
+  ## operate on single nucle
+  nhldict = deepcopy(nuc)
+  
+  for i in [0,1,2]:
+    nhldict['dims{}'.format(i)] = nhldict['dims'][i]
+  del nhldict['dims']
 
-def nuc2slices_centroid(nuc, halfwidth):
+  for i in [0,1,2,3,4,5]:
+    nhldict['bbox{}'.format(i)] = nhldict['bbox'][i]
+  del nhldict['bbox']
+
+  for i in [0,1,2]:
+    nhldict['coords{}'.format(i)] = nhldict['coords'][i]
+  del nhldict['coords']
+
+  for i in [0,1,2]:
+    nhldict['eigvals_hyp{}'.format(i)] = nhldict['eigvals_hyp'][i]
+  del nhldict['eigvals_hyp']
+
+  if vecs:
+    for i,j in itertools.product(*[[0,1,2],]*2):
+      nhldict['eigvecs_hyp{}{}'.format(i,j)] = nhldict['eigvecs_hyp'][i,j]
+    del nhldict['eigvecs_hyp']
+
+  if moments:
+    for i,j,k in itertools.product(*[[0,1,2],]*3):
+      nhldict['moments_hyp{}{}{}'.format(i,j,k)] = nhldict['moments_hyp'][i,j,k]
+    del nhldict['moments_hyp']
+
+    for i,j,k in itertools.product(*[[0,1,2],]*3):
+      nhldict['moments_img{}{}{}'.format(i,j,k)] = nhldict['moments_img'][i,j,k]
+    del nhldict['moments_img']
+
+  return nhldict
+
+def nuc2slices_centroid(nuc, halfwidth, shift=0):
   a,b,c = map(int, nuc['coords'])
   hw=halfwidth
-  ss = (slice(a-hw, a+hw), slice(b-hw, b+hw), slice(c-hw, c+hw))
+  ss = (slice(a-hw+shift, a+hw+shift), slice(b-hw+shift, b+hw+shift), slice(c-hw+shift, c+hw+shift))
   return ss
 
-def nuc2slices(nuc, pad):
+def nuc2slices(nuc, pad, shift=0):
   a,b,c,d,e,f = nuc['bbox']
-  return slice(a-pad,d+pad), slice(b-pad,e+pad), slice(c-pad,f+pad)
+  ss = slice(a-pad+shift,d+pad+shift), slice(b-pad+shift,e+pad+shift), slice(c-pad+shift,f+pad+shift)
+  return ss
 
-def nuc2img(nuc, img, pad):
-  ss = nuc2slices(nuc, pad=pad)
+def nuc2img(nuc, img, **kwargs):
+  ss = nuc2slices(nuc, **kwargs)
   return img[ss].copy()
 
-def rethresh_nuc(nuc, img, hyp, pad, newthresh=0.75):
-  img_crop = nuc2img(nuc, img, pad)
-  hyp_crop = nuc2img(nuc, hyp, pad)
-  lab, ncells = nd.label(img_crop > newthresh)
-  spimagine.volshow([img_crop, hyp_crop, lab], interpolation='nearest')
-  input('quit?')
-
-def fitgmm(nuc, pimg, hyp, pimgcut=0.5, n_components=2, show=False):
+def fitgmm(nuc, pimg, hyp, pimgcut=0.5, n_components=2, spim=None):
   gm = GaussianMixture(n_components=n_components)
   ss  = nuc2slices(nuc, 0)
   pimg = pimg[ss].copy()
@@ -256,10 +270,10 @@ def fitgmm(nuc, pimg, hyp, pimgcut=0.5, n_components=2, show=False):
     maski = (preds[...,i] > pimgcut) * mask
     hyp[maski] = i+1
   # w2.glWidget.renderer.set_data(np.array([pimg, img2,img3]))
-  if show:
+  if spim:
     img2 = pimg * m0
     img3 = pimg * m1
-    spimagine.volshow([pimg, img2, img3, hyp], interpolation='nearest')
+    spim.volshow([pimg, img2, img3, hyp], interpolation='nearest')
   # plt.contour(ind[]preds[...,1], alpha=0.5)
   return hyp
 
@@ -279,14 +293,6 @@ def anno2y(anno):
     anno2[anno == v]=i
   anno2 = np.array(anno2, dtype=np.float)
   return anno2
-
-  # mask = np.zeros_like(stack['hyp'], dtype=np.bool)
-  # for n in nhl_area[-50:]:
-  #     mask += stack['hyp']==n['label']
-  # pimgcopy = stack['pimg'].copy()
-  # pimgcopy[mask] *= 1.5
-  # w = spimagine.volshow(pimgcopy)
-  # view.moveit(w)
 
 def run_gmm(nhl, pimg, hyp, anno, cutoff=0.65):
   hyp = hyp.copy()
@@ -369,53 +375,6 @@ def two_var_thresh(pimg, c1=0.5, c2=0.9):
   nhl  = hyp2nhl(hyp, pimg)
   return nhl, hyp
 
-def spectral_clustering_seg(img, n_clusters=8, threshold=150):
-    """
-    uses spectral clustering on pixel graph to split connected components.
-    only included here for posterity
-    shitty method for nuclei. also very slow. img is uint16? HypothesisImage.
-    """
-    from sklearn.feature_extraction.image import img_to_graph
-    from sklearn.cluster import spectral_clustering
-    bimg = gputools.blur(img)
-    plt.imshow(bimg)
-    mask=bimg>threshold
-    graph = img_to_graph(bimg, mask=mask)
-    graph.data = np.exp(-graph.data/graph.data.std())
-    labels = spectral_clustering(graph, n_clusters=8)
-    labelsim = np.zeros(bimg.shape)
-    labelsim[mask] = labels
-    return labelsim
-
-@DeprecationWarning
-def pimg2hyp(pimg, th, bl=1.0, minsize=34, maxsize=None, minfilter=0):
-  """
-  segment your probability maps. normalizes to [0,1] just before thresholding.
-  """
-  # TODO: Can we compose the gpu ops to avoid moving data twice?
-  pimg = pimg.copy()
-
-  if minfilter > 0:
-    pimg = gputools.min_filter(pimg, size=minfilter)
-    
-  if bl > 0:
-    hx = gaussian(9, bl)
-    pimg = gputools.convolve_sep3(pimg, hx, hx, hx)
-
-  pimg = pimg/pimg.max()
-  hyp  = nd.label(pimg>th)[0]
-  nhl  = hyp2nhl(hyp, simple=True)
-  def f(n):
-    a = n['area']
-    if minsize > a:
-      return True
-    if maxsize and maxsize < a:
-      return True
-    return False
-  cut = filter(f, nhl)
-  hyp = remove_nucs_hyp(cut, hyp)
-  return hyp
-
 ## padding
 
 def pad(img, w=10, mode='mean'):
@@ -491,17 +450,9 @@ def mask_border_objs(hyp, bg_id=0):
   mask = mask_labels(id_set, hyp)
   return mask
 
-def mask2cmask(mask, dil_iter=2, sig=3.0):
-  mask = nd.binary_dilation(mask, iterations=2).astype('float')
-  hx = gaussian(9, 3.0)
-  mask = gputools.convolve_sep3(mask, hx, hx, hx)
-  mask = mask/mask.max()
-  mask = 1-mask
-  return mask
-
-
 ## recoloring
 
+@DeprecationWarning
 def remove_nucs_hyp(nhl, hyp):
   hyp2 = hyp.copy()
   recolor = np.arange(0, hyp.max()+1, dtype=np.uint64)
@@ -510,6 +461,7 @@ def remove_nucs_hyp(nhl, hyp):
   hyp2 = recolor[hyp.flat].reshape(hyp.shape)
   return hyp2
 
+@DeprecationWarning
 def remove_easy_nuclei(hyp, biga):
   def f(i, c):
     if c=='1':

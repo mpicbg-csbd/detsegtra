@@ -131,7 +131,6 @@ def x2y_labelmap(x, y, lx='x', ly='y', labels_x=None, labels_y=None, **kwargs):
     labels_x2y[(lx, labels_x[i])] = [(ly, v) for v in labels_y[vs] if v!=-1]
   return labels_x2y
 
-
 @DeprecationWarning
 def psg_bipartite(hyp_gt, hyp_seg):
   psg = pixel_sharing_bipartite(hyp_gt, hyp_seg)

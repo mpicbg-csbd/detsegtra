@@ -5,7 +5,8 @@ import skimage.io as io
 import colorsys
 from numba import jit
 from skimage import measure
-
+import os
+import matplotlib.pyplot as plt
 
 from . import voronoi
 
@@ -62,11 +63,15 @@ def labelImg_to_rgb(img, bg_ID=1, membrane_ID=0):
 
 def apply_mapping(lab, mapping):
   maxlabel = lab.max().astype('int')
-  n_channels = len(mapping[0])
+  if hasattr(mapping[0], '__len__'):
+    n_channels = len(mapping[0])
+  else:
+    n_channels = 1
   maparray = np.zeros((maxlabel+1, n_channels))
   for k,v in mapping.items():
     maparray[k] = v
   lab2 = maparray[lab.flat].reshape(lab.shape + (n_channels,))
+  if lab2.shape[-1]==1: lab2 = lab2[...,0]
   return lab2
 
 def permute(lab, perm):
@@ -114,7 +119,6 @@ def cmap_color(img, cmap='viridis', mn=None, mx=None):
   rgb_img = cmap[rgb_img.flat].reshape(rgb_img.shape + (3,))
   return rgb_img
 
-
 def grouped_colormap(basecolors=[(1,0,0), (0,1,0)], mult=[100,100]):
   flatten = lambda l: [item for sublist in l for item in sublist]
   colors = flatten([[c] * m for c,m in zip(basecolors, mult)])
@@ -124,10 +128,12 @@ def grouped_colormap(basecolors=[(1,0,0), (0,1,0)], mult=[100,100]):
   colors = np.clip(colors, 0, 1)
   return colors
 
-
 def make_jpegfolder_from_2drgb_stack(rgb, name='rgb'):
-  assert rgb.ndim==4
-  import os
-  os.makedirs(name)
+  if rgb.ndim==4:
+    pass
+  elif rgb.ndim==3:
+    rgb = cmap_color(rgb)
+  if not os.path.exists(name):
+    os.makedirs(name)
   for i in range(rgb.shape[0]):
     io.imsave(name + '/' + 'rgb{:03d}.jpeg'.format(i), rgb[i])

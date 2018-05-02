@@ -1,5 +1,6 @@
 import numpy as np
 from numba import jit
+from scipy import linalg as LA
 
 
 # taken from stackoverflow
@@ -9,7 +10,6 @@ def PCA(data, dims_rescaled_data=2):
     pass in: data as 2D NumPy array
     """
     # import numpy as np
-    from scipy import linalg as LA
     m, n = data.shape
     # mean center the data
     data -= data.mean(axis=0)

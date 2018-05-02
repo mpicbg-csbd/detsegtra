@@ -93,86 +93,6 @@ def press_gen(fig, img):
             print(img[yi, xi])
     return press
 
-def comboview(img3d, axis=0, hyp=None, tform=None):
-    # axis x,y,z = 2,1,0
-    # show 2d and 3d views
-    # update those views as we move
-
-    # zcur = 50
-
-    # def press(event):
-    #     print('press', event.key)
-    #     sys.stdout.flush()
-    #     if event.key == '1':
-    #         # visible = xl.get_visible()
-    #         # xl.set_visible(not visible)
-    #         fig.gca().images[0].set_visible()
-    #         # fig.canvas.draw()
-    #     if event.key == 'v':
-    #         xi, yi = int(event.xdata + 0.5), int(event.ydata + 0.5)
-    #         print(img[yi, xi])
-    #     if event.key == 'up':
-    #         zcur += 1
-    #         fig.gca().image[0].set_data(img3d[zcur])
-    #     if event.key == 'down':
-    #         zcur -= 1
-    #         fig.gca().image[0].set_data(img3d[zcur])
-
-
-    # def onclick(event):
-    #     print('button=%d, x=%d, y=%d, xdata=%f, ydata=%f' %
-    #           (event.button, event.x, event.y, event.xdata, event.ydata))
-    #     xi, yi = int(event.xdata + 0.5), int(event.ydata + 0.5)
-        
-    #     # define slice of img3d with min that has a max size of 200x200 on it's non-z axes
-    #     xmn,xmx = max(0,xi-r), min(imgproj.shape[1], xi+r)
-    #     ymn,ymx = max(0,yi-r), min(imgproj.shape[0], yi+r)
-    #     if xmx - xmn < 50 or ymx-ymn < 50:
-    #         return
-    #     slc = [slice(ymn,ymx), slice(xmn,xmx)]
-    #     slc.insert(axis, slice(None))
-    #     cube = img3d[slc].copy()
-    #     print(cube.shape)
-
-    #     # define container for data that has exactly 200x200 on it's non-z axes
-    #     shp = [200]*3
-    #     shp[axis] = img3d.shape[axis]
-    #     fullcube = np.zeros(shp, np.float32)
-    #     print(fullcube.shape)
-    #     a,b,c = cube.shape
-        
-    #     # put cube inside of container and update 3d view
-    #     fullcube[:a, :b, :c] = cube
-    #     w.glWidget.renderer.update_data(fullcube)
-    #     w.glWidget.refresh()
-
-
-    # setup 2d figure
-    midspot = img3d.shape[axis]//2
-    slc = [slice(None)]*3
-    slc[axis] = slice(midspot, midspot + 30)
-    # slc[axis] = slice(zcur, zcur+1)
-    imgproj = img3d[slc].max(axis)
-    fig = imshowme(imgproj)
-
-    # spimagine.config.__DEFAULT_SPIN_AXIS__ = 1 #2-axis ## because of opencl axis inversion
-    
-    # setup 3d view
-    r = 100
-    slc = [slice(0,2*r)]*3
-    slc[axis] = slice(None)
-    w = spimagine.volshow(img3d[slc], raise_window=False, interpolation="nearest")
-    if tform:
-        w.transform.fromTransformData(tform)
-    w.glWidget.refresh()
-
-    # define click|press events
-    click_genf = onclick_gen(img3d, w, axis, imgproj.shape, r)
-    # press_genf = press_gen(fig, imgproj)
-    cid = fig.canvas.mpl_connect('button_press_event', click_genf)
-    # cid = fig.canvas.mpl_connect('key_press_event', press)
-    return fig, w
-
 def curate_2imgs(img3d, pimg3d):
     # show 2d and 3d views
     # update those views as we move
@@ -556,3 +476,29 @@ class SelectFromCollection(object):
         self.fc[:, -1] = 1
         self.collection.set_facecolors(self.fc)
         self.canvas.draw_idle()
+
+
+@DeprecationWarning
+class ArrowToggler(object):
+    def __init__(self, iss, tr, draw_arrows, clear_arrows):
+        self.cid = iss.fig.canvas.mpl_connect('key_press_event', self.change_arrows)
+        self.arrows_on = False
+        self.iss = iss
+        self.tr  = tr
+        self.draw_arrows = draw_arrows
+        self.clear_arrows = clear_arrows
+
+    def change_arrows(self, event):
+        self.arrows_on = not self.arrows_on
+        zi = self.iss.idx[0]
+        if event.key == 'a':
+            print('toggle arrows', event.key)
+            if self.arrows_on:
+                zi = min(zi, self.iss.stack.shape[0]-2)
+                print(zi)
+                self.draw_arrows(self.iss, self.tr.al[zi])
+                print("OK")
+            else:
+                self.clear_arrows(self.iss)
+                print("OFF")
+            self.iss.fig.canvas.draw()

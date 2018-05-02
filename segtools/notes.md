@@ -61,6 +61,7 @@ It's currently in voronoi, but it could be in segtools_simple (which should prob
         + curation
         + etc
 
+# Colormaps
 
 
 # bugs

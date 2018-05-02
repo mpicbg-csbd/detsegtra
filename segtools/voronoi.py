@@ -56,6 +56,7 @@ def voronoi_kd(coords, imshape, maxdist=20):
         idximg[mask] = 0
     return idximg, distimg
 
+@DeprecationWarning
 def identify_neibs(lab):
     """
     TODO: should be able to go back and forth between binary structure and list of pixel neighbors
@@ -96,17 +97,21 @@ def label_boundaries_from_direction2d(lab, vec):
     res = v1 != v2
     return np.stack([v1[res], v2[res]])
 
-def label_neighbors(lab, ndim=2):
-    ls = 2*np.identity(ndim, dtype='int')
-    if ndim==3:
+def label_neighbors(lab):
+    ls = 2*np.identity(lab.ndim, dtype='int')
+    if lab.ndim==3:
         res = np.concatenate([label_boundaries_from_direction3d(lab, l) for l in ls], axis=1)
-    elif ndim==2:
+    elif lab.ndim==2:
         res = np.concatenate([label_boundaries_from_direction2d(lab, l) for l in ls], axis=1)
+    neib = label_neib_hist(res.T)
+    return neib
+
+@jit
+def label_neib_hist(res):
     # now build a histogram over tuples? count edges ∀ pairs
-    hist = dict()
-    for l1,l2 in res.T:
-        count = dict.get(hist, (l1,l2), 0)
-        hist[(l1,l2)] = count+1
+    hist = np.zeros((res.max()+1, res.max()+1), dtype=np.uint32)
+    for i in range(res.shape[0]):
+        hist[res[i,0],res[i,1]] += 1
     return hist
 
 def lab2binary_neibs(lab):

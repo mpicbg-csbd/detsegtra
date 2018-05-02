@@ -1,6 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+import spimagine
+
 from . import patchmaker
 from . import lib
 
@@ -53,10 +55,38 @@ def get_cube_from_transform(img, tcube):
     cube = img[zmin:zmax, ymin:ymax, xmin:xmax]
     return cube
 
-def curate_nhl(w, nhl, img, hyp, pp):
+def curate_nocrop(nhl, img, hyp, w):
+    def shownuc(n):
+        img2 = img.copy()
+        mask = lib.mask_nhl([n], hyp)
+        img2[mask] = img2.max() * 1.5
+        update_spim(w, 0, img2)
+        ans = input("How many nuclei do you see? :: ")
+        # ans = (ans, w.transform.maxVal)
+        return ans
+
+    biganno = ['no idea' for _ in nhl]
+
+    i=0
+    while i < len(nhl):
+        ans = shownuc(nhl[i])
+        if ans == 'q':
+            break
+        elif ans == 'k':
+            print("Undo...")
+            i -= 1
+        else:
+            biganno[i] = ans
+            i += 1
+    return biganno
+
+def curate_nhl(nhl, img, hyp, pp, w=None):
+    img = np.pad(img, pp, mode='constant')
+    hyp = np.pad(hyp, pp, mode='constant')
+    
     def crops(i):
         nuc = nhl[i]
-        ss = lib.nuc2slices_centroid(nuc, pp//2)
+        ss = lib.nuc2slices_centroid(nuc, pp, shift=pp)
         img_crop = img[ss].copy()
         hyp_crop = hyp[ss].copy()
         mask = hyp_crop == nuc['label']
@@ -73,8 +103,11 @@ def curate_nhl(w, nhl, img, hyp, pp):
     biganno = ['no idea' for _ in nhl]
 
     imgc, hypc = crops(0)
+    if w is None:
+        w = spimagine.volshow([imgc, hypc])
     w.transform.setMax(imgc.max())
     ans = nextnuc(0)
+
     if ans == 'q':
         return None
     else:
@@ -90,7 +123,7 @@ def curate_nhl(w, nhl, img, hyp, pp):
         else:
             biganno[i] = ans
             i += 1
-    return biganno
+    return w, biganno
 
 def update_spim(w, i, cube):
     w.glWidget.dataModel[i][...] = cube
@@ -187,3 +220,84 @@ def render_rgb_still(hypRGB, w=None, transform=None, fname="sceneRGB.png"):
     flat  = np.stack((chan1, chan2, chan3), axis=-1)
     io.imsave(fname, flat)
     return 
+
+
+def comboview(img3d, axis=0, hyp=None, tform=None):
+    # axis x,y,z = 2,1,0
+    # show 2d and 3d views
+    # update those views as we move
+
+    # zcur = 50
+
+    # def press(event):
+    #     print('press', event.key)
+    #     sys.stdout.flush()
+    #     if event.key == '1':
+    #         # visible = xl.get_visible()
+    #         # xl.set_visible(not visible)
+    #         fig.gca().images[0].set_visible()
+    #         # fig.canvas.draw()
+    #     if event.key == 'v':
+    #         xi, yi = int(event.xdata + 0.5), int(event.ydata + 0.5)
+    #         print(img[yi, xi])
+    #     if event.key == 'up':
+    #         zcur += 1
+    #         fig.gca().image[0].set_data(img3d[zcur])
+    #     if event.key == 'down':
+    #         zcur -= 1
+    #         fig.gca().image[0].set_data(img3d[zcur])
+
+
+    # def onclick(event):
+    #     print('button=%d, x=%d, y=%d, xdata=%f, ydata=%f' %
+    #           (event.button, event.x, event.y, event.xdata, event.ydata))
+    #     xi, yi = int(event.xdata + 0.5), int(event.ydata + 0.5)
+        
+    #     # define slice of img3d with min that has a max size of 200x200 on it's non-z axes
+    #     xmn,xmx = max(0,xi-r), min(imgproj.shape[1], xi+r)
+    #     ymn,ymx = max(0,yi-r), min(imgproj.shape[0], yi+r)
+    #     if xmx - xmn < 50 or ymx-ymn < 50:
+    #         return
+    #     slc = [slice(ymn,ymx), slice(xmn,xmx)]
+    #     slc.insert(axis, slice(None))
+    #     cube = img3d[slc].copy()
+    #     print(cube.shape)
+
+    #     # define container for data that has exactly 200x200 on it's non-z axes
+    #     shp = [200]*3
+    #     shp[axis] = img3d.shape[axis]
+    #     fullcube = np.zeros(shp, np.float32)
+    #     print(fullcube.shape)
+    #     a,b,c = cube.shape
+        
+    #     # put cube inside of container and update 3d view
+    #     fullcube[:a, :b, :c] = cube
+    #     w.glWidget.renderer.update_data(fullcube)
+    #     w.glWidget.refresh()
+
+
+    # setup 2d figure
+    midspot = img3d.shape[axis]//2
+    slc = [slice(None)]*3
+    slc[axis] = slice(midspot, midspot + 30)
+    # slc[axis] = slice(zcur, zcur+1)
+    imgproj = img3d[slc].max(axis)
+    fig = imshowme(imgproj)
+
+    # spimagine.config.__DEFAULT_SPIN_AXIS__ = 1 #2-axis ## because of opencl axis inversion
+    
+    # setup 3d view
+    r = 100
+    slc = [slice(0,2*r)]*3
+    slc[axis] = slice(None)
+    w = spimagine.volshow(img3d[slc], raise_window=False, interpolation="nearest")
+    if tform:
+        w.transform.fromTransformData(tform)
+    w.glWidget.refresh()
+
+    # define click|press events
+    click_genf = onclick_gen(img3d, w, axis, imgproj.shape, r)
+    # press_genf = press_gen(fig, imgproj)
+    cid = fig.canvas.mpl_connect('button_press_event', click_genf)
+    # cid = fig.canvas.mpl_connect('key_press_event', press)
+    return fig, w

@@ -1,6 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+import seaborn as sns
+
 from . import patchmaker
 from . import lib
 
@@ -22,6 +24,26 @@ def nuc_grid_plot(img, nhl):
         patches, coords.reshape(2, -1).T)
     plt.imshow(plotimg)
 
+def nhl2crops(img, nhl, axis=None, pad=10):
+    def f(i):
+        ss = lib.nuc2slices(nhl[i], pad, shift=pad)
+        img_crop = img[ss].copy()
+        if img_crop.ndim==3 and axis is not None: 
+            print('hooligans', ss)
+            a = img_crop.shape[axis]
+            img_crop=img_crop[a//2]
+        return img_crop
+    patches = [f(i) for i in range(len(nhl))]
+    return patches
+
+def plot_nhls(nhls,
+                x=lambda n:n['coords'][0], 
+                y=lambda n:np.log2(n['area'])):
+    cm = sns.cubehelix_palette(len(nhls))
+    for i,nhl in enumerate(nhls):
+        xs = [x(n) for n in nhl]
+        ys = [y(n) for n in nhl]
+        plt.scatter(xs, ys, c=cm[i])
 
 def ax_scatter_data(ax, data, **kwargs):
     """
@@ -45,7 +67,6 @@ def ax_scatter_data(ax, data, **kwargs):
         ax.scatter(xs[mask], ys[mask], s=szs[mask],
                    c=cs[mask], label=l, **kwargs)
 
-
 def ax_scatter_plus(ax, xs, ys, cs, labels, szs):
     """
     matplotlib scatterplot, but you can use a list of labels
@@ -64,7 +85,6 @@ def ax_scatter_plus(ax, xs, ys, cs, labels, szs):
     for l in labelset[inds][::-1]:
         mask = labels == l
         ax.scatter(xs[mask], ys[mask], s=szs[mask], c=cs[mask], label=l)
-
 
 def lineplot(img):
     pal = sns.diverging_palette(255, 133, l=60, n=7, center="dark")
