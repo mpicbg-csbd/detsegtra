@@ -63,7 +63,7 @@ def labelImg_to_rgb(img, bg_ID=1, membrane_ID=0):
 
 def apply_mapping(lab, mapping):
   maxlabel = lab.max().astype('int')
-  if hasattr(mapping[0], '__len__'):
+  if hasattr(list(mapping.keys())[0], '__len__'):
     n_channels = len(mapping[0])
   else:
     n_channels = 1

@@ -5,6 +5,9 @@ import seaborn as sns
 
 from . import patchmaker
 from . import lib
+from . import segtools_simple as ss
+from . import color
+from . import voronoi
 
 
 def nuc_grid_plot(img, nhl):
@@ -97,3 +100,67 @@ def lineplot(img):
         ax.plot(l)
     ax2 = fig.add_axes([0.23, 0.50, 0.3, 0.3])
     ax2.imshow(img.max(0))
+
+
+def make_comparison_image(img_raw, lab, lab_gt, ax=None):
+  # cmap_gt  = np.array([(0,0,0)] + sns.color_palette('hls', lab_gt.max()))
+  # cmap_gt = np.zeros((3000,4), np.float)
+  # cmap_gt[:,[0,1,2]] = rand_cmap(3000)
+  # cmap_gt[1:,3] = 1
+  # lab_gt_recolor = cmap_gt[lab_gt.flat].reshape(lab_gt.shape + (4,))
+
+  if ax is None:
+    ax = plt.gca()
+
+  colormap = plt.cm.Greys_r
+  vm = np.percentile(img_raw, 99.5)
+
+  # compute masks
+
+  psg = ss.pixel_sharing_bipartite(lab_gt, lab)
+  matching = ss.matching_overlap(psg, fractions=(0.5, 0.5))
+  matchstuff = ss.sets_maps_masks_from_matching(lab_gt, lab, matching)
+  m1, m2, m1c, m2c = matchstuff['masks']
+  map1, map2 = matchstuff['maps']
+  labcopy = color.apply_mapping(lab, map2)
+  if m2c.sum() > 0:
+    lab[m2c] = lab[m2c] - lab[m2c].min() + lab_gt[m1].max() + 1
+  lab[m2] = labcopy[m2]
+  
+  # relabel and color
+
+  grb = lab.copy()
+  ggt = lab_gt.copy()
+  borders_lab = voronoi.lab2binary_neibs(grb)
+  borders_lab = borders_lab != 4
+  borders_gt = voronoi.lab2binary_neibs(ggt)
+  borders_gt = borders_gt != 4
+
+  grb[~borders_lab] = 0
+  grb[borders_lab & m2] = 1
+  grb[borders_lab & m2c] = 2
+  green = (0,1,0,.7)
+  lightgreen = (0,1,0,.25)
+  red   = (1,0,0,.7)
+  trans = (0,0,0,0.0)
+  lightblue  = (0,0,1,0.25)
+
+  cmap = np.array([trans, green, red], dtype=np.float)
+
+  grb  = cmap[grb.flat].reshape(grb.shape + (4,))
+  
+  res = ax.imshow(img_raw, cmap=colormap, vmax=vm)
+  ax.imshow(grb)
+
+  # Add Overlay
+
+  # if False:
+  grb = lab_gt.copy()
+  grb[~m1c] = 0
+  grb[m2]   = 2
+  grb[m1c]  = 3
+
+  cmap = np.array([trans, trans, lightgreen, lightblue])
+  grb = cmap[grb.flat].reshape(grb.shape + (4,))
+  ax.imshow(grb)
+  return ax

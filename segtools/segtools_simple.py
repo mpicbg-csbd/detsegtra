@@ -1,6 +1,7 @@
 import numpy as np
 from numba import jit
 from scipy.ndimage import label
+from . import lib as seglib
 
 ## weighted bipartite graphs in matrix form
 
@@ -122,10 +123,11 @@ def matching_masks(lab_gt, lab):
   mask1c = objects in lab that DONT match to gt
   """
   s1,s2,s1c,s2c = matching_sets(lab_gt, lab)
-  mask1  = lib.mask_labels(s1, lab_gt)
-  mask2  = lib.mask_labels(s2, lab)
-  mask1c = lib.mask_labels(s1c, lab_gt)
-  mask2c = lib.mask_labels(s2c, lab)
+  # from . import lib as seglib
+  mask1  = seglib.mask_labels(s1, lab_gt)
+  mask2  = seglib.mask_labels(s2, lab)
+  mask1c = seglib.mask_labels(s1c, lab_gt)
+  mask2c = seglib.mask_labels(s2c, lab)
   return mask1, mask2, mask1c, mask2c
 
 def sets_maps_masks_from_matching(lab_gt, lab, matching):
@@ -137,10 +139,10 @@ def sets_maps_masks_from_matching(lab_gt, lab, matching):
   s2 = set(map2.keys())
   s1c = (set(np.unique(lab_gt)) - {0}) - s1
   s2c = (set(np.unique(lab))    - {0}) - s2
-  mask1  = lib.mask_labels(s1, lab_gt)
-  mask2  = lib.mask_labels(s2, lab)
-  mask1c = lib.mask_labels(s1c, lab_gt)
-  mask2c = lib.mask_labels(s2c, lab)
+  mask1  = seglib.mask_labels(s1, lab_gt)
+  mask2  = seglib.mask_labels(s2, lab)
+  mask1c = seglib.mask_labels(s1c, lab_gt)
+  mask2c = seglib.mask_labels(s2c, lab)
   res = {}
   res['maps'] = (map1, map2)
   res['sets'] = (s1,s2,s1c,s2c)

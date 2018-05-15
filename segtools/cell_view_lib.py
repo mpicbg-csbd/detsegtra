@@ -1,7 +1,7 @@
 ## Additional Matplotlib and Spimagine functionality
 import numpy as np
 import matplotlib
-matplotlib.use('Qt5Agg')
+# matplotlib.use('Qt5Agg')
 import seaborn as sns
 import matplotlib.pyplot as plt
 from matplotlib.widgets import LassoSelector
@@ -115,6 +115,8 @@ def imshowme(img, figsize=None, **kwargs):
     else:
         fig = plt.figure()
     # fig.gca().imshow(img, origin='lower', **kwargs)
+    if img.dtype == np.float16:
+        img = img.astype(np.float32)
     fig.gca().imshow(img, **kwargs)
     fig.gca().set_aspect('equal', 'datalim')
     fig.gca().set_position([0, 0, 1, 1])
