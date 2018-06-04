@@ -1,14 +1,16 @@
-import colorsys
 import networkx as nx
 import numpy as np
-import skimage.io as io
+
 import colorsys
+import skimage.io as io
 from numba import jit
 from skimage import measure
 import os
 import matplotlib.pyplot as plt
 
-from . import voronoi
+from . import label_tools
+
+## colormaps
 
 def pastel_colors_RGB(n_colors=10, brightness=0.5, value=0.5):
   """
@@ -43,80 +45,17 @@ def rand_cmap_uwe(n=256):
   cols[0] = 0
   return cols #matplotlib.colors.ListedColormap(cols)
 
-def labelImg_to_rgb(img, bg_ID=1, membrane_ID=0):
-  """
-  TODO: merge this with the numba version from cell_tracker
-  """
-  # TODO: the RGB_tuples list we generate is 10 times longer than it needs to be
-  RGB_tuples = label_colors(bg_ID, membrane_ID, n_colors=10, maxlabel=img.max())
-  a,b = img.shape
-  rgb = np.zeros((a,b,3), dtype=np.float32)
-  for val in np.unique(img):
-      mask = img==val
-      print(mask.shape)
-      # rgb[mask,:] = np.array(get_color_from_label(val))
-      rgb[mask,:] = RGB_tuples[val]
-  # f16max = np.finfo(np.float16).
-  print(rgb.max())
-  # rgb *= 255*255
-  return rgb.astype(np.float32) # Preview on Mac only works with 32bit or lower :)
-
-def apply_mapping(lab, mapping):
-  maxlabel = lab.max().astype('int')
-  if hasattr(list(mapping.keys())[0], '__len__'):
-    n_channels = len(mapping[0])
-  else:
-    n_channels = 1
-  maparray = np.zeros((maxlabel+1, n_channels))
-  for k,v in mapping.items():
-    maparray[k] = v
-  lab2 = maparray[lab.flat].reshape(lab.shape + (n_channels,))
-  if lab2.shape[-1]==1: lab2 = lab2[...,0]
-  return lab2
-
-def permute(lab, perm):
-  if perm.ndim == 1:
-    lab2 = perm[lab.flat].reshape(lab.shape)
-  elif perm.ndim == 2:
-    lab2 = perm[lab.flat].reshape(lab.shape + (perm.shape[1],))
-  else:
-    raise TypeError("perm must be 1D or 2D array")
-  return lab2
-
-def graphcolor(lab):
-  res = voronoi.label_neighbors(lab, ndim=2)
-  g = nx.Graph([(x,y,{'border':res[(x,y)]}) for (x,y) in res.keys()])
-  d = nx.coloring.greedy_color(g)
-  labr = apply_mapping(lab, d)
-  return labr
-
-def mod_color_hypimg(hyp):
-  """
-  give a hypothesis image
-  return an image with values meant for spimagine display
-  when plotting labels. Remember to keep a mask of the zero-values before you mod. Then reset zeros to zero after adding 2x the mod value.
-  """
-  hyp2 = hyp.copy()
-  mask = hyp2==0
-  hyp2 %= 7
-  hyp2 += 5
-  hyp2[mask] = 0
-  return hyp2
-
-def cmap_color(img, cmap='viridis', mn=None, mx=None):
+def mpl_color(img, cmap='viridis', mn=None, mx=None):
   if mn is None : mn = img.min()
   if mx is None : mx = img.max()
   cmap = plt.get_cmap(cmap)
   cmap = np.array(cmap.colors)
-  rgb_img = img.copy()
-  mx = rgb_img.max()
-  rgb_img -= mn
-  rgb_img *= mx/rgb_img.max()
-  rgb_img = rgb_img.clip(min=0)
-  # mn, mx = rgb_img.min(), rgb_img.max()
-  # rgb_img = (rgb_img - mn)/(mx-mn)
-  rgb_img = (255*rgb_img).astype(np.uint8)
-  rgb_img = cmap[rgb_img.flat].reshape(rgb_img.shape + (3,))
+  # rgb_img = img.copy()
+  img = img.copy()
+  img = (img-mn)/(mx-mn)
+  img = img.clip(min=0,max=1)
+  img = ((cmap.shape[0]-1)*img).astype(np.uint8)
+  rgb_img = cmap[img.flat].reshape(img.shape + (3,))
   return rgb_img
 
 def grouped_colormap(basecolors=[(1,0,0), (0,1,0)], mult=[100,100]):
@@ -128,7 +67,70 @@ def grouped_colormap(basecolors=[(1,0,0), (0,1,0)], mult=[100,100]):
   colors = np.clip(colors, 0, 1)
   return colors
 
-def make_jpegfolder_from_2drgb_stack(rgb, name='rgb'):
+
+## recoloring / relabeling / mapping labels to new values
+
+def recolor_from_mapping(lab, mapping):
+  """
+  mapping can be a dictionary of int->value
+  value can be int,uint or float type, can be scalar or vector
+  """
+  maxlabel = lab.max().astype('int')
+  somevalue = list(mapping.values())[0]
+  if hasattr(somevalue, '__len__'):
+    n_channels = len(somevalue)
+  else:
+    n_channels = 1
+  maparray = np.zeros((maxlabel+1, n_channels))
+  for k,v in mapping.items():
+    maparray[k] = v
+  lab2 = maparray[lab.flat].reshape(lab.shape + (n_channels,))
+  if lab2.shape[-1]==1: lab2 = lab2[...,0]
+  return lab2
+
+def recolor_from_ndarray(lab, perm):
+  "perm is an ndarray of length > lab.max()"
+  assert perm.shape[0] > lab.max()
+  if perm.ndim == 1:
+    lab2 = perm[lab.flat].reshape(lab.shape)
+  elif perm.ndim == 2:
+    lab2 = perm[lab.flat].reshape(lab.shape + (perm.shape[1],))
+  else:
+    raise TypeError("perm must be 1D or 2D array")
+  return lab2
+
+def graphcolor(lab):
+  """
+  recolor lab s.t. touching labels have (very) different colors.
+  you can also assign random color to every object, but graph coloring enforces strong differences.
+  """
+  matrix = label_tools.pixelgraph_edge_distribution(lab)
+  mask = matrix > 0
+  pairs = np.indices(matrix.shape)[:,mask].reshape((2,-1)).T
+  # g = nx.Graph([(x,y,{'border':res[(x,y)]}) for (x,y) in res.keys()])
+  g = nx.Graph([(x,y) for (x,y) in pairs])
+  d = nx.coloring.greedy_color(g)
+  labr = recolor_from_mapping(lab, d)
+  return labr
+
+def mod_color_hypimg(hyp):
+  """
+  super simple relabeling of hyp; prefer `graphcolor` to this when time permits.
+  return an image with values meant for spimagine display
+  when plotting labels remember to keep a mask of the zero-values before you mod.
+  Then reset zeros to zero after adding 2x the mod value.
+  """
+  hyp2 = hyp.copy()
+  mask = hyp2==0
+  hyp2 %= 7
+  hyp2 += 5
+  hyp2[mask] = 0
+  return hyp2
+
+## a simple way of saving / compressing a stack.
+
+def make_jpegfolder_from_stack(rgb, name='rgb'):
+  "save a "
   if rgb.ndim==4:
     pass
   elif rgb.ndim==3:

@@ -33,14 +33,14 @@ On the other hand we need to be able to compute seg given pairs of images, becau
 
 # where does label border detection belong?
 
-It's currently in voronoi, but it could be in segtools_simple (which should probably be renamed...). The cool plots from the stardist paper use segtools_simple for getting matching masks/sets/maps and then get object borders from voronoi.
+It's currently in voronoi, but it could be in scores_dense (which should probably be renamed...). The cool plots from the stardist paper use scores_dense for getting matching masks/sets/maps and then get object borders from voronoi.
 
 # Should voronoi be segmentation? How to incorporate ndtess? pathfinder?
 
 - Can we turn pathfinder into a numba program?
 - Is it simple to build ndtess and incorporate pybind11?
 
-# What scores to add to segtools_simple?
+# What scores to add to scores_dense?
 
 - RAND
 - Warping error

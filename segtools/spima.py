@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import spimagine
 
 from . import patchmaker
-from . import lib
+from . import nhl_tools
 
 
 def get_slices_from_transform(img, tcube):

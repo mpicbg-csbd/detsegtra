@@ -1,7 +1,18 @@
 import numpy as np
 from numba import jit
 from scipy.ndimage import label
-from . import lib as seglib
+from . import label_tools
+
+
+## bipartite statistics
+
+def bipartite_entropy(psg, axis=0):
+  "entropy for each object in axis. useful for recoloring."
+  axis = 1-axis
+  entropy = psg/psg.sum(axis=axis, keepdims=True)
+  entropy = np.where(entropy!=0, entropy * np.log2(entropy), 0)
+  entropy = -entropy.sum(axis=axis)
+  return entropy
 
 ## weighted bipartite graphs in matrix form
 
@@ -123,11 +134,11 @@ def matching_masks(lab_gt, lab):
   mask1c = objects in lab that DONT match to gt
   """
   s1,s2,s1c,s2c = matching_sets(lab_gt, lab)
-  # from . import lib as seglib
-  mask1  = seglib.mask_labels(s1, lab_gt)
-  mask2  = seglib.mask_labels(s2, lab)
-  mask1c = seglib.mask_labels(s1c, lab_gt)
-  mask2c = seglib.mask_labels(s2c, lab)
+  # from . import nhl_tools as label_tools
+  mask1  = label_tools.mask_labels(s1, lab_gt)
+  mask2  = label_tools.mask_labels(s2, lab)
+  mask1c = label_tools.mask_labels(s1c, lab_gt)
+  mask2c = label_tools.mask_labels(s2c, lab)
   return mask1, mask2, mask1c, mask2c
 
 def sets_maps_masks_from_matching(lab_gt, lab, matching):
@@ -139,10 +150,10 @@ def sets_maps_masks_from_matching(lab_gt, lab, matching):
   s2 = set(map2.keys())
   s1c = (set(np.unique(lab_gt)) - {0}) - s1
   s2c = (set(np.unique(lab))    - {0}) - s2
-  mask1  = seglib.mask_labels(s1, lab_gt)
-  mask2  = seglib.mask_labels(s2, lab)
-  mask1c = seglib.mask_labels(s1c, lab_gt)
-  mask2c = seglib.mask_labels(s2c, lab)
+  mask1  = label_tools.mask_labels(s1, lab_gt)
+  mask2  = label_tools.mask_labels(s2, lab)
+  mask1c = label_tools.mask_labels(s1c, lab_gt)
+  mask2c = label_tools.mask_labels(s2c, lab)
   res = {}
   res['maps'] = (map1, map2)
   res['sets'] = (s1,s2,s1c,s2c)
@@ -187,12 +198,19 @@ def fix_split_labels(img, labelset):
       img[lab==j] = img.max()+1
 
 def make_dense(lab):
+  "might have to run with denseQ multiple times!"
   for l in denseQ(lab):
     lab[lab==lab.max()] = l
 
-## object predicates
+def identify_background(psg):
+  "just in case it's not zero-labeled. only works with dense labeling."
+  memlabel = np.argmax((psg!=0).sum(0))
+  return memlabel
+
+## predicates
 
 def denseQ(lab):
+  "important: doesn't return true/false, but works as predicate as set() evals to False."
   return set(np.arange(lab.min(), lab.max()+1)) - set(np.unique(lab))
 
 def matchingQ(matching):

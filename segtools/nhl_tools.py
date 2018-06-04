@@ -13,47 +13,21 @@ from skimage.morphology import watershed
 from skimage.feature import peak_local_max
 from skimage import measure
 
-from . import voronoi
+from . import label_tools
 from . import math_utils
-from . import segtools_simple
+from . import scores_dense
 from . import color
-from . import loc_utils
 
 
-@DeprecationWarning
-def pixel_confusion(pimg, labelimg, threshold):
-  """
-  data specific! labeling has bg=1, nuclei=2, unknown=0. pimg only has one (nuclei) channel!
-  labeling: is sparse labeling image with same shape as pimg.
-  pimg: is a probability map for nuclei pixels
-  """
-  assert np.unique(labelimg).tolist()==[0,1,2]
-  assert pimg.min()>=0 and pimg.max()<=1
-  nuclei_mask = (pimg > threshold).astype('uint8') + 1
-  m = labelimg==1
-  c11 = (nuclei_mask[m]==1).sum() # true negative
-  c12 = (nuclei_mask[m]==2).sum() # false positive
-  m = labelimg==2
-  c21 = (nuclei_mask[m]==1).sum() # false negative
-  c22 = (nuclei_mask[m]==2).sum() # true positive
-  confusion = [c11, c12, c21, c22]
-  return confusion
+## convert multiple nhls across time
 
-## operate on hyp
+def labs2nhls(labs, imgs, **kwargs):
+  nhls = [hyp2nhl(labs[i], imgs[i], **kwargs) for i in range(labs.shape[0])]
+  return nhls
 
-def hyp2areahist(hyp):
-  rps   = measure.regionprops(hyp)
-  sizes = [int(rp.area) for rp in rps if rp.label != 0]
-  res = loc_utils.hist_dense(sizes, bins=40)
-  return res
+## convert dense object representation into sparse representation (hyp 2 nhl)
 
-def hyp2coords(hyp):
-  rps   = measure.regionprops(hyp)
-  coords = [np.mean(rp.coords, axis=0) for rp in rps if rp.label != 0]
-  coords = np.array(coords)
-  return coords
-
-def hyp2nhl_2d(hyp, img=None, time=None, simple=False):
+def hyp2nhl(hyp, img=None, neighbordist=False, **kwargs):
   """
   TODO: allow local_center to choose between center of binary mask, and brightness-weighted center of hypothesis.
   TODO: check types on boundary to `moments_central` call.
@@ -63,133 +37,71 @@ def hyp2nhl_2d(hyp, img=None, time=None, simple=False):
   else:
     rps = measure.regionprops(hyp, img)
 
-  neibs = voronoi.label_neighbors(hyp)
-  tot = neibs.sum(0) + neibs.sum(1)
-
-  def f(rp):
-    coords = np.mean(rp.coords, axis=0).tolist()
-    miny,minx,maxy,maxx = rp.bbox
-    crop = hyp[miny:maxy, minx:maxx].copy()
-    crop = crop==rp.label
-    # mu1 = moments_central(crop, [0,0,0], 1)
-    # print(mu1)
-    # sm = mu1[0,0,0]
-    # local_center = [mu1[1,0,0]/sm, mu1[0,1,0]/sm, mu1[0,0,1]/sm]
-    local_center = [coords[0]-miny, coords[1]-minx]
-    # local_centroid = rp.local_centroid
-    mu = rp.moments_central #math_utils.moments_central(crop, map(int, local_center), 2)
-    sig = rp.inertia_tensor #math_utils.inertia_tensor(mu)
-    eigvals, eigvecs = np.linalg.eig(sig)
-    features = {'label'   : rp.label,
-                'area'    : int(rp.area),
-                'coords'  : coords,
-                'bbox'    : rp.bbox,
-                'dims'    : [maxy-miny,maxx-minx],
-                'surf'    : tot[rp.label]}
-
-    if time is not None:
-      features['time'] = time
-
-    if simple:
-      return features
-    
-    # assert False
-
-    extra = {'moments_hyp' : mu,
-             'eigvals_hyp' : eigvals,
-             'eigvecs_hyp' : eigvecs, }
-
-    features = {**features, **extra}
-
-    if img is not None:
-      crop_img = img[miny:maxy, minx:maxx].copy()
-      crop_img[~crop] = 0
-      # mu2 = math_utils.moments_central(crop_img, map(int, local_center), 2)
-      mu2 = rp.moments_central
-      # print(mu2, type(mu2))
-      features['moments_img']   = mu2
-      # print(rp.max_intensity, type(rp.max_intensity))
-      # mn, mx = np.asscalar(rp.max_intensity), np.asscalar(rp.min_intensity)
-      features['max_intensity'] = np.asscalar(rp.max_intensity)
-      features['min_intensity'] = np.asscalar(rp.min_intensity)
-    
-    return features
-
-  nhl = [f(rp) for rp in rps]
+  nhl = [regionprop2features(rp,hyp,img=img,**kwargs) for rp in rps]
   nhl  = sorted(nhl, key=lambda n: n['area'])
+
+  if neighbordist:
+    ## distribution of neighbor label values. works in 2d and 3d
+    neibs = label_tools.dict_of_neighbor_distribution(hyp)
+    for nuc in nhl:
+      nuc['neighbor_distribution'] = neibs[nuc['label']]
+      nuc['permimeter'] = sum(neibs[nuc['label']][1])
+
   return nhl
 
-def hyp2nhl(hyp, img=None, time=None, simple=False):
-  """
-  TODO: allow local_center to choose between center of binary mask, and brightness-weighted center of hypothesis.
-  TODO: check types on boundary to `moments_central` call.
-  """
-  if img is None:
-    rps = measure.regionprops(hyp)
-  else:
-    rps = measure.regionprops(hyp, img)
-
-  neibs = voronoi.label_neighbors(hyp)
-  tot = neibs.sum(0) + neibs.sum(1)
-
-  def f(rp):
-    coords = np.mean(rp.coords, axis=0).tolist()
+def regionprop2features(rp, hyp, img=None, time=None, moments=False):
+  # centroid = rp.coords.mean(0)
+  if hyp.ndim==3:
     minz,miny,minx,maxz,maxy,maxx = rp.bbox
+    dims = [maxz-minz,maxy-miny,maxx-minx]
+    # ss   = [slice(minz, maxz), slice(miny, maxy), slice(minx,maxx)]
+  elif hyp.ndim==2:
+    miny,minx,maxy,maxx = rp.bbox
+    dims = [maxy-miny,maxx-minx]
+    # ss   = [slice(miny, maxy), slice(minx,maxx)]
+
+  features = {'label'    : rp.label,
+              'area'     : int(rp.area),
+              'centroid' : rp.centroid,
+              'bbox'     : rp.bbox,
+              'dims'     : dims,
+              'slice'    : rp._slice,
+              }
+
+  if time is not None:
+    features['time'] = time
+
+  ## moments
+  if moments and hyp.ndim==3:
+    local_center = [coords[0]-minz, coords[1]-miny, coords[2]-minx]
     crop = hyp[minz:maxz, miny:maxy, minx:maxx].copy()
     crop = crop==rp.label
-    # mu1 = moments_central(crop, [0,0,0], 1)
-    # print(mu1)
-    # sm = mu1[0,0,0]
-    # local_center = [mu1[1,0,0]/sm, mu1[0,1,0]/sm, mu1[0,0,1]/sm]
-    features = {'label'   : rp.label,
-                'area'    : int(rp.area),
-                'coords'  : coords,
-                'bbox'    : rp.bbox,
-                'dims'    : [maxz-minz,maxy-miny,maxx-minx],
-                'surf'    : tot[rp.label]}
-
-    if time is not None:
-      features['time'] = time
-
-    if simple:
-      return features
-    
-    local_center = [coords[0]-minz, coords[1]-miny, coords[2]-minx]
-    # local_centroid = rp.local_centroid
     mu = math_utils.moments_central(crop, map(int, local_center), 2)
     sig = math_utils.inertia_tensor(mu)
     eigvals, eigvecs = np.linalg.eig(sig)
-    extra = {'moments_hyp' : mu,
-             'eigvals_hyp' : eigvals,
-             'eigvecs_hyp' : eigvecs, }
+    features['moments_central'] = mu
+    features['inertia_tensor'] = sig
+    features['inertia_tensor_eigvals'] = eigvals
+    features['inertia_tensor_eigvecs'] = eigvecs
+  elif moments and hyp.ndim==2:
+    features['moments_central'] = rp.moments_central
+    eigvals, eigvecs = np.linalg.eig(rp.inertia_tensor)
+    features['inertia_tensor'] = rp.inertia_tensor
+    features['inertia_tensor_eigvals'] = eigvals
+    features['inertia_tensor_eigvecs'] = eigvecs
+    rp.moments_central
 
-    features = {**features, **extra}
+  # if moments and img is not None and hyp.ndim==3:
+  #   crop_img = img[minz:maxz, miny:maxy, minx:maxx].copy()
+  #   crop_img[~crop] = 0
+  #   mu2 = math_utils.moments_central(crop_img, map(int, local_center), 2)
+  #   features['moments_img']   = mu2
+  #   features['max_intensity'] = np.asscalar(rp.max_intensity)
+  #   features['min_intensity'] = np.asscalar(rp.min_intensity)
+  
+  return features
 
-    if img is not None:
-      crop_img = img[minz:maxz, miny:maxy, minx:maxx].copy()
-      crop_img[~crop] = 0
-      mu2 = math_utils.moments_central(crop_img, map(int, local_center), 2)
-      # print(mu2, type(mu2))
-      features['moments_img']   = mu2
-      # print(rp.max_intensity, type(rp.max_intensity))
-      # mn, mx = np.asscalar(rp.max_intensity), np.asscalar(rp.min_intensity)
-      features['max_intensity'] = np.asscalar(rp.max_intensity)
-      features['min_intensity'] = np.asscalar(rp.min_intensity)
-    
-    return features
-
-  nhl = [f(rp) for rp in rps]
-  nhl  = sorted(nhl, key=lambda n: n['area'])
-  return nhl
-
-def labs2nhls(labs, imgs, simple=True):
-    if labs.ndim==3:
-        nhls = [hyp2nhl_2d(labs[i], imgs[i], simple=simple) for i in range(labs.shape[0])]
-    elif labs.ndim==4:
-        nhls = [hyp2nhl(labs[i], imgs[i], simple=simple) for i in range(labs.shape[0])]
-    return nhls
-
-## operate on nhl
+## operate on nhl. convert sparse, structured representation into flat representation suitable for learning.
 
 def nhl_mnmx(nhl, prop):
   areas = [n[prop] for n in nhl]
@@ -238,45 +150,46 @@ def flatten_nuc(nuc, vecs=True, moments=True):
 
   return nhldict
 
-def nuc2slices_centroid(nuc, halfwidth, shift=0):
+def nuc2slices_centroid(nuc, halfwidth=0, shift=0):
   a,b,c = map(int, nuc['coords'])
   hw=halfwidth
   ss = (slice(a-hw+shift, a+hw+shift), slice(b-hw+shift, b+hw+shift), slice(c-hw+shift, c+hw+shift))
   return ss
 
-def nuc2slices(nuc, pad, shift=0):
+def nuc2slices(nuc, pad=0, shift=0):
   a,b,c,d,e,f = nuc['bbox']
   ss = slice(a-pad+shift,d+pad+shift), slice(b-pad+shift,e+pad+shift), slice(c-pad+shift,f+pad+shift)
   return ss
 
-def nuc2img(nuc, img, **kwargs):
-  ss = nuc2slices(nuc, **kwargs)
-  return img[ss].copy()
+## operates on nuc mask
 
-def fitgmm(nuc, pimg, hyp, pimgcut=0.5, n_components=2, spim=None):
-  gm = GaussianMixture(n_components=n_components)
+def fitgmm_mask(mask, **kwargs):
+  nd = mask.ndim
+  gm = GaussianMixture(**kwargs)
+  ind = np.indices(mask.shape)
+  ind_mask = ind[:, mask]
+  ind_mask = ind_mask.reshape(nd, -1).T
+  gm.fit(ind_mask)
+  ind = ind.reshape(nd, -1).T
+  preds = gm.predict_proba(ind)
+  preds = preds.reshape(mask.shape + (-1,))
+  return gm, preds
+
+def fitgmm_to_nuc(nuc, pimg, hyp, pimgcut=0.5, n_components=2, spim=None):
   ss  = nuc2slices(nuc, 0)
   pimg = pimg[ss].copy()
   hyp = hyp[ss].copy()
-  ind = np.indices(hyp.shape)
-  mask = hyp==nuc['label']
-  ind = ind[:, mask]
-  ind = ind.reshape(3, -1).T
-  gm.fit(ind)
-  ind = np.indices(hyp.shape)
-  ind = ind.reshape(3, -1).T
-  preds = gm.predict_proba(ind)
-  preds = preds.reshape(hyp.shape + (n_components,))
-  # preds = preds.sum(0)
-  ind = ind.reshape((3,) + hyp.shape)
+
   # plt.contour(ind[1,0], ind[2,0], preds[...,0])
   # plt.contour(ind[1,0], ind[2,0], preds[...,1])
+  mask = hyp==nuc['label']
+  gm, preds = fitgmm_mask(mask)
   hyp[mask] = 0
   # assert False
   for i in range(n_components):
     maski = (preds[...,i] > pimgcut) * mask
     hyp[maski] = i+1
-  # w2.glWidget.renderer.set_data(np.array([pimg, img2,img3]))
+    # hyp[maski] = hyp.max() + 1 ## why not this?
   if spim:
     img2 = pimg * m0
     img3 = pimg * m1
@@ -291,17 +204,9 @@ def grow_nuc(nuc, newmin, hyp, pimg):
   newlab *= nuc['label']
   return newlab
 
-## requires anno
+## Requires annotations
 
-def anno2y(anno):
-  anno2 = anno.copy()
-  anno_vals = ['0', '1', '1.5', '2', 'h']
-  for i,v in enumerate(anno_vals):
-    anno2[anno == v]=i
-  anno2 = np.array(anno2, dtype=np.float)
-  return anno2
-
-def run_gmm(nhl, pimg, hyp, anno, cutoff=0.65):
+def fit_gmm_to_nhl(nhl, pimg, hyp, anno, cutoff=0.65):
   hyp = hyp.copy()
   for i in range(len(nhl)):
     nuc = nhl[i]
@@ -309,7 +214,7 @@ def run_gmm(nhl, pimg, hyp, anno, cutoff=0.65):
     ss = nuc2slices(nuc, 0)
     hyp_crop  = hyp[ss].copy()
     mask = hyp_crop == nuc['label']
-    hyp2 = fitgmm(nuc, pimg, hyp, pimgcut=cutoff, n_components=n_components)
+    hyp2 = fitgmm_to_nuc(nuc, pimg, hyp, pimgcut=cutoff, n_components=n_components)
     # print(np.unique(hyp2, return_counts=True))
     print(hyp.max(), hyp2[mask].max())
     hyp2[hyp2!=0] += hyp.max() # avoid label conflicts
@@ -319,7 +224,7 @@ def run_gmm(nhl, pimg, hyp, anno, cutoff=0.65):
   # hyp  = remove_nucs_hyp(cut, hyp)
   return hyp
 
-def grow_all(nhl, anno, hyp, pimg):
+def grow_all_nucs_in_nhl(nhl, anno, hyp, pimg):
   for i in range(len(nhl)):
     nuc = nhl[i]
     ann = anno[i]
@@ -360,16 +265,16 @@ def water_thresh_whole(nhl, pimg, hyp):
   hyp  = remove_nucs_hyp(cut, hyp)
   return hyp
 
-def var_thresh(pimg, lab1, t2):
+def var_thresh(pimg, lab1, c2):
   nhl = hyp2nhl(lab1, img=pimg)
   def f(mi):
-    if mi < t2:
+    if mi < c2:
       return 0.98 * mi
     else:
-      return t2
+      return c2
   cmap = {n['label'] : f(n['max_intensity']) for n in nhl}
   cmap[0] = 1.0
-  l1_max = color.apply_mapping(lab1, cmap)
+  l1_max = color.recolor_from_mapping(lab1, cmap)
   m2 = pimg > l1_max
   return m2
 
@@ -384,6 +289,7 @@ def two_var_thresh(pimg, c1=0.5, c2=0.9):
 
 ## padding
 
+@DeprecationWarning
 def pad(img, w=10, mode='mean'):
   assert w > 0
   a,b,c = img.shape
@@ -397,12 +303,14 @@ def pad(img, w=10, mode='mean'):
   imgdbox[:, :, -w:] = img[:, :, -1].mean()
   return imgdbox
 
+@DeprecationWarning
 def pad4curation(img, hyp, nhl, pad=40):
   img_pad = pad_img(img, pad)
   hyp_pad = pad_img(hyp, pad)
   nhl_pad = pad_nhl(nhl, pad)
   return img_pad, hyp_pad, nhl_pad
   
+@DeprecationWarning
 def pad_nhl(nhl, pad=40):
   nhl_pad = deepcopy(nhl)
   q = pad
@@ -413,6 +321,7 @@ def pad_nhl(nhl, pad=40):
     n['bbox'] = (a+q,b+q,c+q,d+q,e+q,f+q)
   return nhl_pad
 
+@DeprecationWarning
 def pad_img(img, pad=40, val=0):
   "pad with `val`"
   a,b,c = img.shape
@@ -429,33 +338,8 @@ def normalize_percentile_to01(img, a, b):
   img = (1.0*img - mn)/(mx-mn)
   return img
 
-
 ## masking
 
-def mask_nhl(nhl, hyp):
-  labels = [n['label'] for n in nhl]
-  mask = mask_labels(labels, hyp)
-  return mask
-
-def mask_labels(labels, hyp):
-  mask = hyp.copy()
-  recolor = np.zeros(hyp.max()+1, dtype=np.bool)
-  for l in labels:
-    recolor[l] = True
-  mask = recolor[hyp.flat].reshape(hyp.shape)
-  return mask
-
-def mask_border_objs(hyp, bg_id=0):
-  id_set = set()
-  id_set = id_set | set(np.unique(hyp[0])) - {bg_id}
-  id_set = id_set | set(np.unique(hyp[-1])) - {bg_id}
-  id_set = id_set | set(np.unique(hyp[:,0])) - {bg_id}
-  id_set = id_set | set(np.unique(hyp[:,-1])) - {bg_id}
-  if hyp.ndim == 3:
-    id_set = id_set | set(np.unique(hyp[:,:,0])) - {bg_id}
-    id_set = id_set | set(np.unique(hyp[:,:,-1])) - {bg_id}
-  mask = mask_labels(id_set, hyp)
-  return mask
 
 ## recoloring
 

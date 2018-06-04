@@ -141,7 +141,11 @@ def piece_together_ragged_2d(patches, coords):
 
 def argmax3d(img):
   "equivalent to divmod chaining"
+  # alternative: return np.argwhere(img == img.max()) -- this return all equiv maxima.
   return np.unravel_index(img.argmax(), img.shape)
+
+
+
 
 def patchify(img, patch_shape):
   """
@@ -157,15 +161,18 @@ def patchify(img, patch_shape):
   return np.lib.stride_tricks.as_strided(img, shape=shape, strides=strides)
 
 def sub_block_apply(func, img, sub_blocks=(1,1,1)):
-  a,b,c = img.shape
-  n1, n2, n3 = sub_blocks
-  ar = list(range(0, a+1, a//n1)); ar[-1]=None
-  br = list(range(0, b+1, b//n2)); br[-1]=None
-  cr = list(range(0, c+1, c//n3)); cr[-1]=None
-  res = np.zeros_like(img)
-  for i in range(n1):
-    for j in range(n2):
-      for k in range(n3):
-        ss = (slice(ar[i], ar[i+1]), slice(br[j], br[j+1]), slice(cr[k], cr[k+1]))
-        res[ss] = func(img[ss])
-  return res
+    """
+    apply a function to subblocks of a 3D stack
+    """
+    a,b,c = img.shape
+    n1, n2, n3 = sub_blocks
+    ar = list(range(0, a+1, a//n1)); ar[-1]=None
+    br = list(range(0, b+1, b//n2)); br[-1]=None
+    cr = list(range(0, c+1, c//n3)); cr[-1]=None
+    res = np.zeros_like(img)
+    for i in range(n1):
+        for j in range(n2):
+            for k in range(n3):
+                ss = (slice(ar[i], ar[i+1]), slice(br[j], br[j+1]), slice(cr[k], cr[k+1]))
+                res[ss] = func(img[ss])
+    return res

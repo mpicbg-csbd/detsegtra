@@ -133,7 +133,6 @@ def build_kernel_nd(w, n, func):
     res = np.array(res).reshape(dom.shape[1:])
     return res
 
-
 def cart2pol(x, y):
     rho = np.sqrt(x**2 + y**2)
     phi = np.arctan2(y, x)
@@ -143,3 +142,10 @@ def pol2cart(rho, phi):
     x = rho * np.cos(phi)
     y = rho * np.sin(phi)
     return(x, y)
+
+def xyz2rthetaphi(v):
+    x,y,z = v
+    r = np.sqrt(x**2 + y**2 + z**2)
+    th = np.arctan(y/x)
+    ph = np.arccos(z/r)
+    return r,th,ph

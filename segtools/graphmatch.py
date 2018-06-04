@@ -3,12 +3,12 @@ import networkx as nx
 import numpy as np
 from numba import jit
 from skimage import measure
-from .loc_utils import list2dist
+from collections import Counter
 
 """
 This module works with networkx-based bipartite graphs and matchings
 """
-    
+
 def get_centroids(hyp):
   rps = measure.regionprops(hyp)
   coords = [np.mean(rp.coords, axis=0) for rp in rps]
@@ -163,9 +163,9 @@ def match_stats(nx_bipartite, matching, from_x='gt_', to_y='seg_'):
   n_unmatched     = n_gt_unmatched + n_seg_unmatched
 
   degrees_gt  = [deg for k,deg in nx_bipartite.degree() if k[0]=='gt_']
-  degdist_gt  = list2dist(degrees_gt)
+  degdist_gt  = Counter(degrees_gt)
   degrees_seg = [deg for k,deg in nx_bipartite.degree() if k[0]=='seg_']
-  degdist_seg = list2dist(degrees_seg)
+  degdist_seg = Counter(degrees_seg)
 
   summary = {'n_cells'  : n_gt,
              'n_segs'   : n_seg,
