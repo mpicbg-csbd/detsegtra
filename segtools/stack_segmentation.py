@@ -1,6 +1,6 @@
-from ipython_defaults import *
-from scipy.optimize import minimize, basinhopping, differential_evolution
-from scipy.optimize import OptimizeResult
+from defaults.ipython import watershed, distance_transform_edt, label, np
+# from scipy.optimize import minimize, basinhopping, differential_evolution
+# from scipy.optimize import OptimizeResult
 
 
 def watershed_two_chan(x, nuc_mask=0.5, nuc_seed=0.8, mem_mask=1.0, mem_seed=1.0, ch_nuc=1, ch_mem=0, **kwargs):
@@ -33,8 +33,8 @@ def flat_thresh_two_chan(x, nuc_mask=0.5, mem_mask=0.5, ch_nuc=1, ch_mem=0):
 
 ## --- objective functions ---
 
-def noop_min(fun, x0, args, **options):
-  return OptimizeResult(x=x0, fun=fun(x0, *args), success=True, nfev=1)
+# def noop_min(fun, x0, args, **options):
+#   return OptimizeResult(x=x0, fun=fun(x0, *args), success=True, nfev=1)
   
 
 def poisson_disk_sample(width=1.0, height=1.0, radius=0.25, k=30):
