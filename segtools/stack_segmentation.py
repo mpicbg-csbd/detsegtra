@@ -1,4 +1,4 @@
-from defaults.ipython import watershed, distance_transform_edt, label, np
+from .defaults.ipython import watershed, distance_transform_edt, label, np
 # from scipy.optimize import minimize, basinhopping, differential_evolution
 # from scipy.optimize import OptimizeResult
 

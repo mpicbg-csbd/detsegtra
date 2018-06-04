@@ -8,7 +8,7 @@ import json
 import random
 from pathlib import Path
 
-from defaults.ipython import perm
+from .defaults.ipython import perm
 from . import nhl_tools
 
 from keras.activations import softmax
