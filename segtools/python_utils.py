@@ -75,6 +75,9 @@ def consume(iterator):
 def compose(*funcs):
   return lambda x: reduce(lambda f,g: g(f), funcs, x)
 
+def pipeline(*steps):
+  return reduce(lambda f,g: g(f), steps)
+
 
 ## print type hierarchy for arbitrary objects
 
