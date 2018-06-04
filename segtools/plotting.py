@@ -116,7 +116,7 @@ def make_comparison_image(img_raw, lab, lab_gt, ax=None):
   matchstuff = ss.sets_maps_masks_from_matching(lab_gt, lab, matching)
   m1, m2, m1c, m2c = matchstuff['masks']
   map1, map2 = matchstuff['maps']
-  labcopy = color.apply_mapping(lab, map2)
+  labcopy = color.recolor_from_mapping(lab, map2)
   if m2c.sum() > 0:
     lab[m2c] = lab[m2c] - lab[m2c].min() + lab_gt[m1].max() + 1
   lab[m2] = labcopy[m2]
@@ -134,10 +134,10 @@ def make_comparison_image(img_raw, lab, lab_gt, ax=None):
   grb[borders_lab & m2] = 1
   grb[borders_lab & m2c] = 2
   
-  green = (0,1,0,.7)
+  green      = (0,1,0,.7)
   lightgreen = (0,1,0,.25)
-  red   = (1,0,0,.7)
-  trans = (0,0,0,0.0)
+  red        = (1,0,0,.7)
+  trans      = (0,0,0,0.0)
   lightblue  = (0,0,1,0.25)
 
   cmap = np.array([trans, green, red], dtype=np.float)

@@ -1,4 +1,4 @@
-from .ipython_defaults import *
+from .ipython import *
 
 ## This is safe to use on machine without $DISPLAY env var (headless furiosa)
 import matplotlib

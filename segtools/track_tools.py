@@ -401,7 +401,7 @@ def recolor_every_frame(lab, cm):
     # labr = np.zeros(lab.shape + (3,))
     labr = []
     for i in range(lab.shape[0]):
-        labr.append(color.apply_mapping(lab[i], cm[i]))
+        labr.append(color.recolor_from_mapping(lab[i], cm[i]))
     labr = np.array(labr)
     if labr.shape[-1]==1: labr = labr[...,0]
     return labr
