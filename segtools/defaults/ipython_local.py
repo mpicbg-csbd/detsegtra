@@ -1,4 +1,4 @@
-from .ipython_defaults import *
+from .ipython import *
 
 ## visual stuff relying on anaconda
 import matplotlib
@@ -12,6 +12,7 @@ import seaborn as sns
 
 from .. import spima
 from .. import track_tools
+from .. import nhl_tools
 
 sys.path.insert(0,'/Users/broaddus/Desktop/Projects/')
 from stackview.stackview import Stack #, StackQt
@@ -48,13 +49,13 @@ def updateall(w,lab):
 
 def update_selection(w, img, hyp, r, nhl):
   img2 = img.copy()
-  mask = seglib.mask_nhl(nhl, hyp)
+  mask = nhl_tools.mask_nhl(nhl, hyp)
   img2[mask] = img2[mask]*r
   spima.update_spim(w, 0, img2)
 
 def update_stack(iss, img, hyp, r, nhl):
   img2 = img.copy()
-  mask = seglib.mask_nhl(nhl, hyp)
+  mask = nhl_tools.mask_nhl(nhl, hyp)
   img2[mask] = img2[mask]*r
   iss.stack = img2
 

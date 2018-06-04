@@ -21,7 +21,7 @@ def broadcast_nonscalar_op(op, arr, subaxes, axes_full=None):
   return arr
 
 def broadcast_nonscalar_func(func, arr, subaxes, axes_full=None):
-  "func must preserve ndim, but not necessarily shape."
+  "func does not necessarily preserve ndim or shape."
   N = arr.ndim
   M = len(subaxes)
   if axes_full is None:
@@ -158,3 +158,9 @@ def sorted_uniques(img):
   a,b = np.unique(img, return_counts=True)
   counts = sorted(zip(a,b), key=lambda c: c[1])
   return counts
+
+
+def argmax3d(img):
+  "equivalent to divmod chaining"
+  # alternative: return np.argwhere(img == img.max()) -- this return all equiv maxima.
+  return np.unravel_index(img.argmax(), img.shape)

@@ -1,4 +1,5 @@
 import numpy as np
+import itertools
 
 @DeprecationWarning
 def sample_patches(data, patch_size, n_samples=100, verbose=False):
@@ -22,6 +23,7 @@ def sample_patches(data, patch_size, n_samples=100, verbose=False):
 
 ## get patches from an image given coordinates and patch shapes.
 
+@DeprecationWarning
 def sample_patches_from_img(coords, img, shape, boundary_cond='mirror'):
     """
     TODO: enable boundary conditions on all sides of the img, not just bottom and right.
@@ -44,6 +46,7 @@ def sample_patches_from_img(coords, img, shape, boundary_cond='mirror'):
 
 ## Different ways of sampling pixel coordinates from an image
 
+@DeprecationWarning
 def random_patch_coords(img, n, shape):
     y_width, x_width = shape
     xc = np.random.randint(img.shape[0]-x_width, size=n)
@@ -60,6 +63,46 @@ def regular_patch_coords(img, patchshape, step):
             coords.append((y,x))
     return np.array(coords)
 
+
+
+def slices_grid(imgshape, sliceshape, overlap=(0,0,0), offset=(0,0,0)):
+    "slices do no not go beyond boundaries. boundary conditions must be handled separately."
+
+    def f(i,n):
+        return slice(i,i+sliceshape[n])
+
+    def rng(i):
+        return (offset[i], imgshape[i]-sliceshape[i]+1, sliceshape[i]-overlap[i])
+
+    alist = np.arange(*rng(0))
+    blist = np.arange(*rng(1))
+    if len(imgshape)==2:
+        it = itertools.product(alist, blist)
+        slices = [[f(i,0), f(j,1)] for i,j in it]
+    elif len(imgshape)==3:
+        clist = np.arange(*rng(2))
+        it = itertools.product(alist, blist, clist)
+        slices = [[f(i,0), f(j,1), f(k,2)] for i,j,k in it]
+    
+    return np.array(slices)
+
+def grow_slices(ss, dx=1):
+    if not hasattr(dx,'__len__'):
+        dx = [dx]*len(ss)
+    ss = list(ss)
+    for i,sl in enumerate(ss):
+        a = sl.start - dx[i]
+        b = sl.stop + dx[i]
+        assert 0 <= a < b
+        ss[i] = slice(a,b,sl.step)
+    return ss
+
+def slice_shape(ss):
+    "note this is not equivalent to img[ss].shape if ss has negative values or step!=1."
+    return tuple([sl.stop-sl.start for sl in ss])
+
+
+@DeprecationWarning
 def square_grid_coords(img, step):
     a,b = img.shape
     a2,ar = divmod(a, step)
@@ -74,11 +117,13 @@ def square_grid_coords(img, step):
 
 ## piece together a single image from a list of coordinates and patches
 
+
+@DeprecationWarning
 def piece_together(patches, coords, imgshape=None, border=0):
     """
     patches must all be same shape!
     patches.shape = (sample, x, y, channel) or (sample, x, y)
-    coords.shape = (sample, 2)
+    coords.shape  = (sample, 2)
     TODO: potentially add more ways of recombining than a simple average, i.e. maximum, etc
     """
 
@@ -118,6 +163,8 @@ def piece_together(patches, coords, imgshape=None, border=0):
         res = res[:a, :b]
     return res
 
+
+@DeprecationWarning
 def piece_together_ragged_2d(patches, coords):
     """
     patches is a list of ndarrays of potentially varying size.
@@ -139,14 +186,6 @@ def piece_together_ragged_2d(patches, coords):
         patch_img[x:x+dx, y:y+dy] = img
     return patch_img
 
-def argmax3d(img):
-  "equivalent to divmod chaining"
-  # alternative: return np.argwhere(img == img.max()) -- this return all equiv maxima.
-  return np.unravel_index(img.argmax(), img.shape)
-
-
-
-
 def patchify(img, patch_shape):
   """
   From StackOverflow https://stackoverflow.com/questions/16774148/fast-way-to-slice-image-into-overlapping-patches-and-merge-patches-to-image?noredirect=1&lq=1
@@ -160,6 +199,7 @@ def patchify(img, patch_shape):
   strides = (a_str, X_str, Y_str, X_str, Y_str, b_str)
   return np.lib.stride_tricks.as_strided(img, shape=shape, strides=strides)
 
+@DeprecationWarning
 def sub_block_apply(func, img, sub_blocks=(1,1,1)):
     """
     apply a function to subblocks of a 3D stack

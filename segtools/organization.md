@@ -31,13 +31,41 @@ functions for turning segmented images (hyp) into nhl's.
 ## track_tools.py
 functions for turning nhls into tracking solutions
 - recoloring images based on lineage
-- plotting arrows for flow on top of stacks
 - needed params are:
     + k and dub for graph_connections
+        * knn_t+1, dub_t+1
     + edge,velgrad costs (scale? offset? nonlinearity?)
+        * edge_cost_scale, velgrad_cost_scale
     + cutoff dist for velgrad neighbors. or cost decay w distance? physically motivated?
+        * neib_graph_cutoff
     + appearance costs? (size difference, etc)
-+ 
+if we use **kwargs in definition, then we don't get to capture any names in current scope; we only pass them on.
+if we have some unused keyword args passed into any func in the calltree without a **kwargs in func def then errors.
+the callee defines names to which the caller must adhere. or at least the names must be consistent.
+positional args allows for renaming values at function boundaries.
+you can still rename values with keyword args, but the caller must know the name of the callee.
+if you pass a dictionary then the dictionary can be renamed, but the vals inside cannot.
+the caller and callee must agree on dict internals.
+in a tall call tree we must pass the dict around as an arg throughout the whole tree, even if it never changes inside any func body.
+an alternative to passing around params through deep call trees is to have a global name that the funcs can reference. 
+We can either define a global name that lives as a module attribue (same level as function names), or we can encapsulate the functions and these global names inside a class.
+Encapsulation inside a class enforces that we can't call the functions until we have instantiated the class.
+it also allows us to have mutliple instantiations / tracking problems setup in the same python instance with different params, while still mainting the ease of global state.
+the obnoxious part of classes is the separate "initialize" and "call" steps.
+can you use kwargs like a normal dictionry of params if you want to avoid providing a default param value?
+This means you have to reference your variable name inside of strings instead of giving it a proper name in the scope.
+python allows you to pass around dictionaries.
+if i want to enfore shared names between caller and callee.
+it matters that we know who the callers are in advance.
+so grouping code into functions is only to abstract procedure names, not argument names.
+even positional args names are usually shared between caller and callee throughout the library.
+
+
+
+
+## track_vis.py
+- plotting arrows for flow on top of stacks
+- integration with stackviewer and spimagine for viewing and editing tracking solns.
 
 ## numpy_utils.py
 functions for reshaping and permuting numpy arrays
@@ -46,11 +74,18 @@ functions for reshaping and permuting numpy arrays
 
 ## patchmaker.py
 converting images into patches and back again
+- we should rethink how this works. the main function should probably be to generate lists/ndarrays of slices.
+- this generalizes to 3D, allows for ragged shapes easily, and can be used to re-assign after transformations as long as shape doesn't shange.
+- takes up less memory than copying entire stacks. usually we don't want to copy.
+- padding/boundary conditions are the responsibility of the caller!
+- using an overlap when building slice list is easier than stride tricks directly on ndarray!
+- applying functions to patches and re-sowing becomes trivial. What about when patch size changes?
+- 
 - grid sample patches
 - random sample patches
 - sewing patches back together
 - applying functions to patches / block-wise
-- should this be combined with [numpy_utils.py]() ? 
+- should this be combined with [numpy_utils.py]() ?
 
 ## python_utils.py
 simple python functions that should always be available
