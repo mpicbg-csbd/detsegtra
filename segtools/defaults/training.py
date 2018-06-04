@@ -4,11 +4,11 @@ from keras.callbacks import ModelCheckpoint, LearningRateScheduler, EarlyStoppin
 
 import hyperopt as ho
 
-from segtools import nhl_tools as seglib
-from segtools import scores_dense as ss
-from segtools import plotting
+from .. import nhl_tools
+from .. import scores_dense as ss
+from .. import plotting
+from .. import unet
+from .. import augmentation
+from .. import stack_segmentation as stackseg
 
-import unet
 # import lib as ll
-import augmentation
-import stack_segmentation as stackseg

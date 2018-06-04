@@ -154,6 +154,29 @@ def psg_bipartite(hyp_gt, hyp_seg):
 
 ## ---- matchings from bipartites ----
 
+def unique_matching(bipartite):
+  match = {}
+  deg = bipartite.degree()
+  for v,u in bipartite.edges_iter():
+      if deg[v]==deg[u]==1:
+          match[v]=u
+          match[u]=v
+  return match
+
+def weighted_bipartite2matching(bipartite, func):
+  match = {}
+  for v,d in bipartite.node.items():
+    a1 = d['area']
+    for e,d in bipartite.edge[v].items():
+      ov = d['overlap']
+      a2 = bipartite.node[e]['area']
+      d['iou'] = ov/(a1 + a2 - ov)
+      if ov/a1 >= 0.5 and ov/a2 >= 0.5:
+        match[v] = e
+  return match
+
+## stats
+
 def match_stats(nx_bipartite, matching, from_x='gt_', to_y='seg_'):
   n_gt            = len([n for (t,n) in nx_bipartite.node if t==from_x])
   n_seg           = len([n for (t,n) in nx_bipartite.node if t==to_y])
@@ -178,28 +201,7 @@ def match_stats(nx_bipartite, matching, from_x='gt_', to_y='seg_'):
              'dd_gt'    : degdist_gt,
              'dd_seg'   : degdist_seg}
   return summary
-
-def unique_matching(bipartite):
-  match = {}
-  deg = bipartite.degree()
-  for v,u in bipartite.edges_iter():
-      if deg[v]==deg[u]==1:
-          match[v]=u
-          match[u]=v
-  return match
-
-def weighted_bipartite2matching(bipartite, func):
-  match = {}
-  for v,d in bipartite.node.items():
-    a1 = d['area']
-    for e,d in bipartite.edge[v].items():
-      ov = d['overlap']
-      a2 = bipartite.node[e]['area']
-      d['iou'] = ov/(a1 + a2 - ov)
-      if ov/a1 >= 0.5 and ov/a2 >= 0.5:
-        match[v] = e
-  return match
-
+  
 ## maximum matching with nx.bipartite.maximum_matching
 
 def compare_nhls(nhl_gt, nhl_seg):

@@ -67,7 +67,6 @@ def grouped_colormap(basecolors=[(1,0,0), (0,1,0)], mult=[100,100]):
   colors = np.clip(colors, 0, 1)
   return colors
 
-
 ## recoloring / relabeling / mapping labels to new values
 
 def recolor_from_mapping(lab, mapping):
