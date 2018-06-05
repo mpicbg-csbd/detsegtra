@@ -19,16 +19,32 @@ from .python_utils import print_sorted_counter, reduce
 ## TrackFactory is a class so  
 
 class TrackFactory(object):
+    """
+    Provides methods for assignment tracking on nhls.
+    Builds a networkx graph of potential connections across time.
+    Build a PuLP problem with costs for each connection.
+    Minimizes the resulting the LP problem
+    """
 
-    def __init__(self):
-        self.knn_n = 3
-        self.knn_dub = 50
-        self.neib_edge_cutoff = 40
-        self.graph_cost_stats = []
-        self.do_velcorr = True
-        self.velgrad_scale=20
-        self.edge_scale=20
-        self.on_edges = None
+    def __init__(self, 
+                knn_n            = 3,
+                knn_dub          = 50,
+                neib_edge_cutoff = 40,
+                graph_cost_stats = [],
+                do_velcorr       = True,
+                velgrad_scale    = 20,
+                edge_scale       = 20,
+                on_edges         = None,
+                ):
+
+        self.knn_n              = knn_n
+        self.knn_dub            = knn_dub
+        self.neib_edge_cutoff   = neib_edge_cutoff
+        self.graph_cost_stats   = graph_cost_stats
+        self.do_velcorr         = do_velcorr
+        self.velgrad_scale      = velgrad_scale
+        self.edge_scale         = edge_scale
+        self.on_edges           = on_edges
 
         # self.on_edges = [((1,93), (2,100)),
         #             ((3,119), (4,96)),
@@ -183,28 +199,34 @@ class TrackFactory(object):
     def vertcost(self, nucdict, n):
         return -1
 
-def print_cost_stats(graph_cost_stats):
-    header = " {: <7s}"*4
-    header = header.format("Mean", "Min", "Max", "Std")
+def cost_stats_lines(graph_cost_stats):
+    lines = []
+
+    def f(string):
+        # print(string)
+        lines.append(string)
+
+    header  = " {: <7s}"*4
+    header  = header.format("Mean", "Min", "Max", "Std")
+    numline = "{: .4f} "*4
 
     if False:
-        print("\n\nVert Costs")
-        print(header)
+        f("\n\nVert Costs")
+        f(header)
         for x in graph_cost_stats[::3]:
-            st = "{: .4f} "*4
-            print(st.format(*x))
+            f(numline.format(*x))
 
-    print("\n\nEdge Costs")
-    print(header)
+    f("\n\nEdge Costs")
+    f(header)
     for x in graph_cost_stats[1::3]:
-        st = "{: .4f} "*4
-        print(st.format(*x))
+        f(numline.format(*x))
 
-    print("\n\nVelGrad Costs")
-    print(header)
+    f("\n\nVelGrad Costs")
+    f(header)
     for x in graph_cost_stats[2::3]:
-        st = "{: .4f} "*4
-        print(st.format(*x))
+        f(numline.format(*x))
+
+    return lines
 
 def compose_trackings(trackfactory, tracklist, nhls):
     """
