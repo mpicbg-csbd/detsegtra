@@ -14,10 +14,9 @@ from . import scores_dense as ss
 from . import nhl_tools
 from . import graphmatch as gm
 from . import color
-from .python_utils import print_sorted_counter
+from .python_utils import print_sorted_counter, reduce
 
-## A single function to do everything
-
+## TrackFactory is a class so  
 
 class TrackFactory(object):
 
@@ -31,25 +30,26 @@ class TrackFactory(object):
         self.edge_scale=20
         self.on_edges = None
 
-    def nhls2tracking(self, nhls):
-        # graph = nhls2graph(nhls)
-        mats, labels = zip(*[nhl2matrix(nhl) for nhl in nhls])
-        bips = [gm.connect_points_digraph(mats[i], 
+        # self.on_edges = [((1,93), (2,100)),
+        #             ((3,119), (4,96)),
+        #             ((3,134), (4,107))]
+
+    def nhls2graph(self, nhls):
+        mats, labels = zip(*[nhl_tools.nhl2matrix(nhl) for nhl in nhls])
+        bips = [gm.connect_points_digraph(mats[i],
                                             mats[i+1], 
                                             lx=i, 
                                             ly=i+1, 
-                                            labels_x=labs[i], 
-                                            labels_y=labs[i+1], 
+                                            labels_x=labels[i], 
+                                            labels_y=labels[i+1], 
                                             k=self.knn_n, 
                                             dub=self.knn_dub) for i in range(len(mats)-1)]
-
-
         graph = reduce(nx.compose, bips[1:], bips[0])
-        nucdict = nhls2nucdict(nhls)
+        return graph
 
-        # on_edges = [((1,93), (2,100)),
-        #             ((3,119), (4,96)),
-        #             ((3,134), (4,107))]
+    def nhls2tracking(self, nhls):
+        graph = self.nhls2graph(nhls)
+        nucdict = nhl_tools.nhls2nucdict(nhls)
 
         prob, vv, ev = self.graph2pulp(graph, nhls)
 
@@ -69,7 +69,7 @@ class TrackFactory(object):
         return tr
 
     def build_neighbor_graphs(self, nhls):
-        nucdict = nhls2nucdict(nhls)
+        nucdict = nhl_tools.nhls2nucdict(nhls)
         points = lambda i: np.array([n['centroid'] for n in nhls[i]])
         labels = lambda i: [(i, n['label']) for n in nhls[i]]
         def f(points, labels):
@@ -83,7 +83,7 @@ class TrackFactory(object):
     def graph2pulp(self, graph, nhls):
         prob = pulp.LpProblem("Assignment Problem", pulp.LpMinimize)
 
-        nuc_dict = nhls2nucdict(nhls)
+        nuc_dict = nhl_tools.nhls2nucdict(nhls)
 
         ## vertex and edge variables
         vertvars = pulp.LpVariable.dicts('verts', graph.nodes, lowBound=0, upBound=1, cat=pulp.LpBinary)
@@ -131,7 +131,7 @@ class TrackFactory(object):
     def add_velocity_correlation(self, prob, graph, nhls, edgevars):
         ## velocity correlation variables
         neighbor_graphs = self.build_neighbor_graphs(nhls)
-        nuc_dict = nhls2nucdict(nhls)
+        nuc_dict = nhl_tools.nhls2nucdict(nhls)
         neighbor_vars = []
         for ng in neighbor_graphs[:-1]:
             for e in ng.edges:
@@ -183,7 +183,46 @@ class TrackFactory(object):
     def vertcost(self, nucdict, n):
         return -1
 
+def print_cost_stats(graph_cost_stats):
+    header = " {: <7s}"*4
+    header = header.format("Mean", "Min", "Max", "Std")
 
+    if False:
+        print("\n\nVert Costs")
+        print(header)
+        for x in graph_cost_stats[::3]:
+            st = "{: .4f} "*4
+            print(st.format(*x))
+
+    print("\n\nEdge Costs")
+    print(header)
+    for x in graph_cost_stats[1::3]:
+        st = "{: .4f} "*4
+        print(st.format(*x))
+
+    print("\n\nVelGrad Costs")
+    print(header)
+    for x in graph_cost_stats[2::3]:
+        st = "{: .4f} "*4
+        print(st.format(*x))
+
+def compose_trackings(trackfactory, tracklist, nhls):
+    """
+    glue independent, overlapping tracking solutions back together.
+    TODO: assert that the resulting solution is still valid!
+    """
+    tvs = [[(0, v[1]) for v in tracklist[0].tv[0]]]
+    for i,tr in enumerate(tracklist):
+        tvs.append([(i+1, v[1]) for v in tr.tv[1]])
+    tes = [[((i,u[1]), (i+1,v[1])) for u,v in tr.te[0]] for i,tr in enumerate(tracklist)]
+    tb = true_branching(tvs,tes)
+    cm = lineagecolormaps(tb, tvs)
+    # nhls = nhl_tools.filter_nhls(nhls)
+    nucdict = nhl_tools.nhls2nucdict(nhls)
+    graph = trackfactory.nhls2graph(nhls)
+    al = arrowlist(tb, tvs, nucdict)
+    tr = Tracking(graph, tb, tvs, tes, al, cm)
+    return tr
 
 ## general graph manipulation
 
@@ -199,37 +238,6 @@ def remove_long_edges(g, nucdict, cutoff):
 
 ## utilities and data munging
 
-def filter_nhls(nhls):
-    def fil(n):
-        if 3 < np.log2(n['area']):
-            return True
-        return False
-    nhls2 = []
-    for i,nhl in enumerate(nhls):
-        nhl = [n for n in nhl if fil(n)]
-        nhls2.append(nhl)
-    return nhls2
-
-def nhl2matrix(nhl):
-    if False:
-        flat = [[n['area'],
-                n['bbox'][0],
-                n['bbox'][1],
-                n['bbox'][2],
-                n['bbox'][3],
-                n['centroid'][0],
-                n['centroid'][1]] for n in nhl]
-    flat = [[n['centroid'][0],
-             n['centroid'][1]] for n in nhl]
-    labels = [n['label'] for n in nhl]
-    return np.array(flat), np.array(labels)
-
-def nhls2nucdict(nhls, f=lambda x: x):
-    d = dict()
-    for i, nhl in enumerate(nhls):
-        for n in nhl:
-            d[(i, n['label'])] = f(n)
-    return d
 
 @DeprecationWarning
 def nhls2nhldicts(nhls):
@@ -394,7 +402,7 @@ def color_group(lab, group):
 
 def recolor_every_frame(lab, cm):
     # labr = np.zeros(lab.shape + (3,))
-    
+
     labr = []
     for i in range(lab.shape[0]):
         labr.append(color.recolor_from_mapping(lab[i], cm[i]))
@@ -451,18 +459,4 @@ def set_track_time(tr, time):
     te2 = [((v[0]+time,v[1]), (u[0]+time, u[1])) for u,v in tr.te]
     tb2 = nx.from_edgelist([((v[0]+time,v[1]), (u[0]+time, u[1])) for u,v in tr.tb.edges], create_using=nx.DiGraph())
     return tb2
-
-def compose_trackings(tracklist, nhls):
-    tvs = [[(0, v[1]) for v in tracklist[0].tv[0]]]
-    for i,tr in enumerate(tracklist):
-        tvs.append([(i+1, v[1]) for v in tr.tv[1]])
-    tes = [[((i,u[1]), (i+1,v[1])) for u,v in tr.te[0]] for i,tr in enumerate(tracklist)]
-    tb = true_branching(tvs,tes)
-    cm = lineagecolormaps(tb, tvs)
-    # nhls = filter_nhls(nhls)
-    nucdict = nhls2nucdict(nhls)
-    graph = nhls2graph(nhls)
-    al = arrowlist(tb, tvs, nucdict)
-    tr = Tracking(graph, tb, tvs, tes, al, cm)
-    return tr
 

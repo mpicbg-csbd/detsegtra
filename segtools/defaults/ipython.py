@@ -35,7 +35,8 @@ import skimage.io as io
 ## my own stuff
 from .. import color
 from .. import nhl_tools
-from .. import scores_dense as ss
+from .. import track_tools as tt
+from .. import scores_dense as sd
 from .. import patchmaker as patch
 from .. import plotting
 from ..numpy_utils import *

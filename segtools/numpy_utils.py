@@ -162,5 +162,5 @@ def sorted_uniques(img):
 
 def argmax3d(img):
   "equivalent to divmod chaining"
-  # alternative: return np.argwhere(img == img.max()) -- this return all equiv maxima.
+  # alternative: return np.argwhere(img == img.max()) -- this returns all equiv maxima.
   return np.unravel_index(img.argmax(), img.shape)
