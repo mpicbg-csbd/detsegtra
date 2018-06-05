@@ -30,13 +30,13 @@ class TrackFactory(object):
                 knn_n            = 3,
                 knn_dub          = 50,
                 neib_edge_cutoff = 40,
-                graph_cost_stats = [],
                 do_velcorr       = True,
                 velgrad_scale    = 20,
                 edge_scale       = 20,
                 on_edges         = None,
                 ):
 
+        graph_cost_stats = []
         self.knn_n              = knn_n
         self.knn_dub            = knn_dub
         self.neib_edge_cutoff   = neib_edge_cutoff
@@ -53,12 +53,12 @@ class TrackFactory(object):
     def nhls2graph(self, nhls):
         mats, labels = zip(*[nhl_tools.nhl2matrix(nhl) for nhl in nhls])
         bips = [gm.connect_points_digraph(mats[i],
-                                            mats[i+1], 
-                                            lx=i, 
-                                            ly=i+1, 
-                                            labels_x=labels[i], 
-                                            labels_y=labels[i+1], 
-                                            k=self.knn_n, 
+                                            mats[i+1],
+                                            lx=i,
+                                            ly=i+1,
+                                            labels_x=labels[i],
+                                            labels_y=labels[i+1],
+                                            k=self.knn_n,
                                             dub=self.knn_dub) for i in range(len(mats)-1)]
         graph = reduce(nx.compose, bips[1:], bips[0])
         return graph
@@ -191,8 +191,8 @@ class TrackFactory(object):
         
         dx = np.array(v1['centroid']) - np.array(v2['centroid'])
         dxnorm = dx / self.edge_scale
-        # distcost = (dxnorm*dxnorm).sum() - 1.0
-        distcost = np.linalg.norm(dxnorm) - 1.0
+        distcost = (dxnorm*dxnorm).sum() - 1.0
+        # distcost = np.linalg.norm(dxnorm) - 1.0
         # return 0.0
         return distcost
 
@@ -357,7 +357,7 @@ def lineagelabelmap(tb,tv):
 ## compute statistics on a Tracking
 
 def stats_tr(tr):
-    stats(tr.tv, tr.te, tr.tb)
+    return stats(tr.tv, tr.te, tr.tb)
 
 def stats(tv, te, tb):
     # print("\nDescendants")
@@ -384,6 +384,7 @@ def stats(tv, te, tb):
         c = Counter([len(nx.ancestors(tb, n)) for n in tv[i]])
         table.append([i] + [c[j] for j in range(i+1)])
     print(tabulate(table))
+    return table
 
 def plot_flow_hist(tr):
     "note: for these plots we switch x&y s.t. up corresponds to x = image up"

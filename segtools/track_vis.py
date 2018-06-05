@@ -1,5 +1,6 @@
 import numpy as np
 from stackview.stackview import Stack
+import matplotlib
 
 def draw_flow_current(iss, flowlist):
     draw_flow(iss, flowlist[min(iss.stack.shape[0]-2, iss.idx[0])])
@@ -43,8 +44,40 @@ def clear_arrows(iss):
 def remove_top_image_from_iss(iss):
     del iss.fig.axes[0].images[-1]
 
-def draw_arrows_current_3d(iss, tr):
+def draw_arrows_current_3d(iss, tr, dz=10):
     t,z = iss.idx
     arrows = tr.al[min(iss.stack.shape[0]-2, t)]
-    arrows = [a for a in arrows if z-10 < a[0][0] < z+10]
+    arrows = [a for a in arrows if z-dz < a[0][0] < z+dz]
     draw_arrows(iss, arrows, lambda x: x[[1,2]])
+
+def load_tracks_into_spimagine(w, img, tr):
+    "n is nuclear hypothesis in (time, id) format."
+    wcc = sorted(nx.weakly_connected_components(tr.tb),key=lambda x:len(x))
+    nucdict = nhl_tools.nhls2nucdict(nhls)
+    img2 = np.pad(img, (0,1,40,40,0), mode='constant')
+    best = wcc[-2]
+    slices = [nhl_tools.nuc2slices_centroid(nucdict[n], (1,40,40), (1,40,40)) for n in best]
+    patches = np.array([img2[2:][i][slices[i]] for i in range(len(slices))])
+
+
+def plot_projected_trajectories():
+    for bes in wcc[-3:]:
+        trajectory = np.array([nucdict[n]['centroid'] for n in bes])
+        plt.plot(trajectory[:,2], trajectory[:,1])
+
+def plot_proj_traj(iss, nhls, dz=10):
+    t,z = iss.idx
+    ax = iss.fig.gca()
+    ax.patches = []
+    nhl = nhls[t]
+    nhl = [n for n in nhl if z-dz < n['centroid'][0] < z+dz]
+    for nuc in nhl:
+        x,y = nuc['centroid'][2], nuc['centroid'][1]
+        p = matplotlib.patches.Circle((x,y),radius=20,fill=False)
+        ax.add_patch(p)
+
+    # offsets = np.array([n['centroid'] for n in nhl])[:,[2,1]]
+    # coll = matplotlib.collections.CircleCollection([400]*len(nhl), transOffset=offsets)
+
+
+

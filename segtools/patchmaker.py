@@ -64,7 +64,6 @@ def regular_patch_coords(img, patchshape, step):
     return np.array(coords)
 
 
-
 def slices_grid(imgshape, sliceshape, overlap=(0,0,0), offset=(0,0,0)):
     "slices do no not go beyond boundaries. boundary conditions must be handled separately."
 
@@ -86,7 +85,7 @@ def slices_grid(imgshape, sliceshape, overlap=(0,0,0), offset=(0,0,0)):
     
     return np.array(slices)
 
-def grow_slices(ss, dx=1):
+def grow(ss, dx=1):
     if not hasattr(dx,'__len__'):
         dx = [dx]*len(ss)
     ss = list(ss)

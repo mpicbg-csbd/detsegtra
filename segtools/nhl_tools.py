@@ -160,8 +160,8 @@ def flatten_nuc(nuc, vecs=True, moments=True):
   del nhldict['bbox']
 
   for i in [0,1,2]:
-    nhldict['coords{}'.format(i)] = nhldict['coords'][i]
-  del nhldict['coords']
+    nhldict['centroid{}'.format(i)] = nhldict['centroid'][i]
+  del nhldict['centroid']
 
   for i in [0,1,2]:
     nhldict['eigvals_hyp{}'.format(i)] = nhldict['eigvals_hyp'][i]
@@ -184,9 +184,15 @@ def flatten_nuc(nuc, vecs=True, moments=True):
   return nhldict
 
 def nuc2slices_centroid(nuc, halfwidth=0, shift=0):
-  a,b,c = map(int, nuc['coords'])
-  hw=halfwidth
-  ss = (slice(a-hw+shift, a+hw+shift), slice(b-hw+shift, b+hw+shift), slice(c-hw+shift, c+hw+shift))
+  centroid = [int(x) for x in nuc['centroid']]
+  if not hasattr(halfwidth, '__len__'):
+    halfwidth = [halfwidth]*len(centroid)
+  if not hasattr(shift, '__len__'):
+    shift = [shift]*len(centroid)
+
+  def f(i):
+    return slice(centroid[i] - halfwidth[i] + shift[i], centroid[i] + halfwidth[i] + shift[i])
+  ss = [f(i) for i in range(len(centroid))]
   return ss
 
 def nuc2slices(nuc, pad=0, shift=0):
@@ -348,8 +354,8 @@ def pad_nhl(nhl, pad=40):
   nhl_pad = deepcopy(nhl)
   q = pad
   for n in nhl_pad:
-    a,b,c = n['coords']
-    n['coords'] = [a+q, b+q, c+q]
+    a,b,c = n['centroid']
+    n['centroid'] = [a+q, b+q, c+q]
     a,b,c,d,e,f = n['bbox']
     n['bbox'] = (a+q,b+q,c+q,d+q,e+q,f+q)
   return nhl_pad
