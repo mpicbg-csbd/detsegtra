@@ -1,20 +1,18 @@
 ## anaconda
 import numpy as np
-# import scipy.spatial as spatial
 import scipy.ndimage as nd
-# from skimage import measure
-# from numba import jit
 from scipy.ndimage.morphology import binary_dilation
 # from scipy.ndimage.measurements import find_objects
-
-## manual install
-# from pykdtree.kdtree import KDTree as pyKDTree
-
-## my lib
-# from .math_utils import xyz2rthetaphi
-from .scores_dense import pixel_sharing_bipartite
 from . import nhl_tools
+from numba import jit
 
+@jit
+def pixel_sharing_bipartite(lab1, lab2):
+  assert lab1.shape == lab2.shape
+  psg = np.zeros((lab1.max()+1, lab2.max()+1), dtype=np.int)
+  for i in range(lab1.size):
+    psg[lab1.flat[i], lab2.flat[i]] += 1
+  return psg
 
 ## borders / boundaries
 

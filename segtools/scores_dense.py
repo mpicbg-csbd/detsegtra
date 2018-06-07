@@ -3,6 +3,13 @@ from numba import jit
 from scipy.ndimage import label
 from . import label_tools
 
+@jit
+def pixel_sharing_bipartite(lab1, lab2):
+  assert lab1.shape == lab2.shape
+  psg = np.zeros((lab1.max()+1, lab2.max()+1), dtype=np.int)
+  for i in range(lab1.size):
+    psg[lab1.flat[i], lab2.flat[i]] += 1
+  return psg
 
 ## bipartite statistics
 
@@ -15,14 +22,6 @@ def bipartite_entropy(psg, axis=0):
   return entropy
 
 ## weighted bipartite graphs in matrix form
-
-@jit
-def pixel_sharing_bipartite(lab1, lab2):
-  assert lab1.shape == lab2.shape
-  psg = np.zeros((lab1.max()+1, lab2.max()+1), dtype=np.int)
-  for i in range(lab1.size):
-    psg[lab1.flat[i], lab2.flat[i]] += 1
-  return psg
 
 def intersection_over_union(psg):
   rsum = np.sum(psg, 0, keepdims=True)
