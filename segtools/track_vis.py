@@ -59,13 +59,12 @@ def load_tracks_into_spimagine(w, img, tr):
     slices = [nhl_tools.nuc2slices_centroid(nucdict[n], (1,40,40), (1,40,40)) for n in best]
     patches = np.array([img2[2:][i][slices[i]] for i in range(len(slices))])
 
-
 def plot_projected_trajectories():
     for bes in wcc[-3:]:
         trajectory = np.array([nucdict[n]['centroid'] for n in bes])
         plt.plot(trajectory[:,2], trajectory[:,1])
 
-def plot_proj_traj(iss, nhls, dz=10):
+def draw_circles(iss, nhls, dz=10):
     t,z = iss.idx
     ax = iss.fig.gca()
     ax.patches = []
@@ -75,6 +74,11 @@ def plot_proj_traj(iss, nhls, dz=10):
         x,y = nuc['centroid'][2], nuc['centroid'][1]
         p = matplotlib.patches.Circle((x,y),radius=20,fill=False)
         ax.add_patch(p)
+
+def draw_both(iss, nhls, tr, dz=10):
+    draw_circles(iss, nhls, dz)
+    draw_arrows_current_3d(iss, tr, dz)
+
 
     # offsets = np.array([n['centroid'] for n in nhl])[:,[2,1]]
     # coll = matplotlib.collections.CircleCollection([400]*len(nhl), transOffset=offsets)

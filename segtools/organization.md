@@ -60,13 +60,6 @@ it matters that we know who the callers are in advance.
 so grouping code into functions is only to abstract procedure names, not argument names.
 even positional args names are usually shared between caller and callee throughout the library.
 
-
-
-
-## track_vis.py
-- plotting arrows for flow on top of stacks
-- integration with stackviewer and spimagine for viewing and editing tracking solns.
-
 ## numpy_utils.py
 functions for reshaping and permuting numpy arrays
 - perm, merg, splt, collapse
@@ -141,7 +134,19 @@ turn 3D stacks into nice 2d images
 - only orthogonal projections?
 - show first non-zero label
 
+## track_vis.py
+- plotting circles and arrows for flow on top of stacks
+- integration with stackviewer and spimagine for viewing and editing tracking solns?
+- 
+
 # interactive stuff
+## annotation.py
+- centerpoint annotation tool
+- Lasso selectors that interact with spimagine
+- lasso selectors that interact with Stack
+- lasso selectors to draw polygons on to Stack
+- potentially merge with cell_view_lib? with spima?
+- 
 
 ## spima.py
 controling spimagine, curating lists of hypotheses

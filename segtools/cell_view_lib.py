@@ -12,42 +12,6 @@ import sys
 
 # ---- interactive 2d + 3d viewing ----
 
-def onclick_sync_stack_with_spimagine(img3d, w, axis, img2dshape, r = 100):
-    """
-    TODO: make this work for 4d
-    """
-    d1len,d2len = img2dshape
-    def onclick(event):
-        print('button=%d, x=%d, y=%d, xdata=%f, ydata=%f' %
-              (event.button, event.x, event.y, event.xdata, event.ydata))
-        xi, yi = int(event.xdata + 0.5), int(event.ydata + 0.5)
-        
-        # define slice of img3d with min that has a max size of 200x200 on it's non-z axes
-        xmn,xmx = max(0,xi-r), min(d2len, xi+r)
-        ymn,ymx = max(0,yi-r), min(d1len, yi+r)
-        if xmx - xmn < 50 or ymx-ymn < 50:
-            return
-        slc = [slice(ymn,ymx), slice(xmn,xmx)]
-        slc.insert(axis, slice(None))
-        cube = img3d[slc].copy()
-        print(cube.shape)
-
-        # define container for data that has exactly 200x200 on it's non-z axes
-        shp = [200]*3
-        shp[axis] = img3d.shape[axis]
-        fullcube = np.zeros(shp, np.float32)
-        print(fullcube.shape)
-        a,b,c = cube.shape
-        
-        # put cube inside of container and update 3d view
-        fullcube[:a, :b, :c] = cube
-        # w.glWidget.renderer.update_data(fullcube)
-        # w.glWidget.refresh()
-        w.glWidget.dataModel[0][...] = cube
-        w.glWidget.dataPosChanged(0)
-
-    return onclick
-
 def imshowme(img, figsize=None, **kwargs):
     if figsize:
         fig = plt.figure(figsize=figsize)
@@ -60,8 +24,6 @@ def imshowme(img, figsize=None, **kwargs):
     fig.gca().set_aspect('equal', 'datalim')
     fig.gca().set_position([0, 0, 1, 1])
     return fig
-
-
 
 class SelectFromCollection(object):
     """

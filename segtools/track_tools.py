@@ -125,7 +125,7 @@ class TrackFactory(object):
         for n in graph.nodes:
             e_in = [edgevars[(v,n)] for v in graph.pred[n]]
             if len(e_in) > 0:
-                prob += pulp.lpSum(e_in) <= vertvars[n], ''
+                prob += pulp.lpSum(e_in)  <= 1 * vertvars[n], ''
 
         if self.on_edges:
             for e in on_edges:
@@ -198,6 +198,7 @@ class TrackFactory(object):
 
     def vertcost(self, nucdict, n):
         return -1
+
 
 def cost_stats_lines(graph_cost_stats):
     lines = []

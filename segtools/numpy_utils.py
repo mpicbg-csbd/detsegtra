@@ -164,3 +164,23 @@ def argmax3d(img):
   "equivalent to divmod chaining"
   # alternative: return np.argwhere(img == img.max()) -- this returns all equiv maxima.
   return np.unravel_index(img.argmax(), img.shape)
+
+def unique_across_axes(arr, axes):
+  """
+  keep `axes`. unique across axes not in `axes`
+  """
+  if type(axes) is int:
+    axes = (axes,)
+  sh = arr.shape
+  sli = [slice(None, None),]*arr.ndim
+  axes_shape = [sh[a] for a in axes]
+  indices = np.indices(axes_shape)
+  print(indices.shape)
+  res = []
+  for idx in indices.reshape((len(axes), -1)).T:
+    for i in range(len(axes)):
+      sli[axes[i]] = idx[i]
+    res.append(np.unique(arr[sli]))
+  res = np.array(res)
+  res = res.reshape(axes_shape)
+  return res

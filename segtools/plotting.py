@@ -5,7 +5,7 @@ import seaborn as sns
 from scipy.spatial import Voronoi
 
 from . import patchmaker
-from . import nhl_tools
+# from . import nhl_tools
 from . import scores_dense as ss
 from . import color
 from . import label_tools
@@ -96,23 +96,13 @@ def lineplot(img):
     ax2 = fig.add_axes([0.23, 0.50, 0.3, 0.3])
     ax2.imshow(img.max(0))
 
-def make_comparison_image(img_raw, lab, lab_gt, ax=None):
-  # cmap_gt  = np.array([(0,0,0)] + sns.color_palette('hls', lab_gt.max()))
-  # cmap_gt = np.zeros((3000,4), np.float)
-  # cmap_gt[:,[0,1,2]] = rand_cmap(3000)
-  # cmap_gt[1:,3] = 1
-  # lab_gt_recolor = cmap_gt[lab_gt.flat].reshape(lab_gt.shape + (4,))
+def make_comparison_image(img_raw, lab, lab_gt, matching, ax=None, **kwargs):
 
   if ax is None:
     ax = plt.gca()
 
-  colormap = plt.cm.Greys_r
-  vm = np.percentile(img_raw, 99.9)
-
   # compute masks
 
-  psg = ss.pixel_sharing_bipartite(lab_gt, lab)
-  matching = ss.matching_overlap(psg, fractions=(0.5, 0.5))
   matchstuff = ss.sets_maps_masks_from_matching(lab_gt, lab, matching)
   m1, m2, m1c, m2c = matchstuff['masks']
   map1, map2 = matchstuff['maps']
@@ -144,12 +134,11 @@ def make_comparison_image(img_raw, lab, lab_gt, ax=None):
 
   grb  = cmap[grb.flat].reshape(grb.shape + (4,))
   
-  res = ax.imshow(img_raw, cmap=colormap, vmax=vm)
+  res = ax.imshow(img_raw, cmap=plt.cm.Greys_r, **kwargs)
   res = ax.imshow(grb)
 
   # Add Overlay
 
-  # if False:
   grb = lab_gt.copy()
   grb[~m1c] = 0
   grb[m2]   = 2
@@ -159,7 +148,6 @@ def make_comparison_image(img_raw, lab, lab_gt, ax=None):
   grb = cmap[grb.flat].reshape(grb.shape + (4,))
   res = ax.imshow(grb)
   return ax
-
 
 def voronoi_plot_2d_w_colors(points, colors, **kwargs):
     vor = Voronoi(points)
@@ -180,8 +168,6 @@ def voronoi_plot_2d_w_colors(points, colors, **kwargs):
     plt.scatter(points[:,0], points[:,1], marker='o', c='k', **kwargs)
     plt.xlim(vor.min_bound[0] - 0.1, vor.max_bound[0] + 0.1)
     plt.ylim(vor.min_bound[1] - 0.1, vor.max_bound[1] + 0.1)
-
-
 
 def _voronoi_finite_polygons_2d(vor, radius=None):
     """
@@ -267,3 +253,23 @@ def _voronoi_finite_polygons_2d(vor, radius=None):
         new_regions.append(new_region.tolist())
 
     return new_regions, np.asarray(new_vertices)
+
+
+def fig2data(fig, shape):
+  "https://stackoverflow.com/questions/35355930/matplotlib-figure-to-image-as-a-numpy-array"
+  from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+
+  canvas = FigureCanvas(fig)
+  canvas.draw()       # draw the canvas, cache the renderer
+  
+  ax = fig.gca()
+  ax.axis('off')
+  
+  fig.set_dpi(100)
+  fig.set_size_inches(shape[1]/100, shape[0]/100, forward=True)
+  fig.tight_layout(pad=0)
+  width, height = shape #fig.get_size_inches() * fig.get_dpi()
+
+  image = np.fromstring(canvas.tostring_rgb(), dtype='uint8')
+  image = image.reshape((int(height), int(width), 3))
+  return image

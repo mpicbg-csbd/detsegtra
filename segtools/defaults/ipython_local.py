@@ -43,16 +43,6 @@ def sync(name, external=False):
   res = run([cmd], shell=True)
   print(res)
 
-def updateall(w,lab):
-  for i in range(lab.shape[0]):
-    spima.update_spim(w,i,lab[i])
-
-def update_selection(w, img, hyp, r, nhl):
-  img2 = img.copy()
-  mask = nhl_tools.mask_nhl(nhl, hyp)
-  img2[mask] = img2[mask]*r
-  spima.update_spim(w, 0, img2)
-
 def update_stack(iss, img, hyp, r, nhl):
   img2 = img.copy()
   mask = nhl_tools.mask_nhl(nhl, hyp)

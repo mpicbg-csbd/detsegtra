@@ -2,7 +2,7 @@ import numpy as np
 from numba import jit
 
 
-## Rendering
+## Rendering 3D stacks
 
 def first_nonzero(arr, axis, invalid_val=-1):
   """
@@ -23,14 +23,35 @@ def max_proj_z_color(arr,plt):
   plt.imshow(arr.max(0), cmap=cmap1, alpha=1)
   plt.imshow(ids, cmap=cmap0, alpha=1)
 
-
-
 def decay(arr, rate=0.02):
   "as rate goes to 0 decay goes to max projection. only along z-dimension. higher z-index = deeper tissue."
   dec  = np.exp(np.arange(arr.shape[0])*rate)
   arr2 = arr*dec.reshape([-1,1,1])
   ids = arr2.argmax(0)
   res = imgidx(arr, ids)
+  return res
+
+## designed for fly
+
+def fourpanel(img):
+  top = twoview(img, axis=2, stackaxis=0, alpha=0.7)
+  perm = np.arange(img.ndim)
+  perm[0] = 2; perm[2] = 0
+  bot = twoview(img.transpose(perm), axis=2, stackaxis=0, alpha=0.7)
+  res = np.concatenate([top, bot], axis=0)
+  return res
+
+def twoview(fly, axis=2, stackaxis=1, alpha=1):
+  w = int(alpha*fly.shape[axis]//2)
+  sli = [slice(None, None)]*3
+  sli[axis] = slice(None, w)
+  left = fly[sli].max(axis)
+  sli[axis] = slice(-w, None)
+  right = fly[sli].max(axis)
+  # if axis!=0:
+  #   left = zoom(left, (5,1)).T
+  #   right = zoom(right, (5,1)).T
+  res = np.concatenate((left, right), axis=stackaxis)
   return res
 
 ## image-indexing
