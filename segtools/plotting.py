@@ -4,6 +4,9 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy.spatial import Voronoi
 
+from skimage.segmentation import find_boundaries
+
+
 from . import patchmaker
 # from . import nhl_tools
 from . import scores_dense as ss
@@ -120,14 +123,16 @@ def make_comparison_image(img_raw, lab, lab_gt, matching, ax=None, **kwargs):
   borders_gt = label_tools.boundary_image(ggt)
   borders_gt = borders_gt != 4
 
+  
   grb[~borders_lab] = 0
   grb[borders_lab & m2] = 1
   grb[borders_lab & m2c] = 2
   
+  trans      = (0,0,0,0.0)
   green      = (0,1,0,.7)
   lightgreen = (0,1,0,.25)
   red        = (1,0,0,.7)
-  trans      = (0,0,0,0.0)
+  lightred   = (1,0,0,.25)
   lightblue  = (0,0,1,0.25)
 
   cmap = np.array([trans, green, red], dtype=np.float)
@@ -138,15 +143,140 @@ def make_comparison_image(img_raw, lab, lab_gt, matching, ax=None, **kwargs):
   res = ax.imshow(grb)
 
   # Add Overlay
-
   grb = lab_gt.copy()
   grb[~m1c] = 0
   grb[m2]   = 2
   grb[m1c]  = 3
 
   cmap = np.array([trans, trans, lightgreen, lightblue])
+  # cmap = np.array([trans, trans, lightgreen, lightred])
+
+  
   grb = cmap[grb.flat].reshape(grb.shape + (4,))
   res = ax.imshow(grb)
+  return ax
+
+def make_comparison_image(img_raw, lab, lab_gt, matching, ax=None, **kwargs):
+
+  if ax is None:
+    ax = plt.gca()
+
+  # compute masks
+
+  matchstuff = ss.sets_maps_masks_from_matching(lab_gt, lab, matching)
+  m1, m2, m1c, m2c = matchstuff['masks']
+  map1, map2 = matchstuff['maps']
+  labcopy = color.recolor_from_mapping(lab, map2)
+  if m2c.sum() > 0:
+    lab[m2c] = lab[m2c] - lab[m2c].min() + lab_gt[m1].max() + 1
+  lab[m2] = labcopy[m2]
+  
+  # relabel and color
+
+  grb = lab.copy()
+  ggt = lab_gt.copy()
+  # borders_lab = label_tools.boundary_image(grb)
+  # borders_lab = borders_lab != 4
+  # borders_gt = label_tools.boundary_image(ggt)
+  # borders_gt = borders_gt != 4
+
+  borders_lab = find_boundaries(lab, mode = "thick")
+  borders_gt = find_boundaries(lab_gt)
+
+  # plt.imshow(borders_lab)
+  # plt.show()
+  # 1/0
+  
+  trans      = (0,0,0,0.0)
+  green      = (0,1,0,.7)
+  lightgreen = (0,1,0,.25)
+  red        = (1,0,0,.7)
+  lightred   = (1,0,0,.25)
+  blue       = (0,.4,1,.7)
+  lightblue  = (0,.4,1,0.25)
+
+    
+  # grb[~borders_lab] = 0
+  # # matched
+  # grb[borders_lab & m2] = 1
+  # # unmatched
+  # grb[borders_lab & m2c] = 2
+
+  grb[~borders_gt] = 0
+  grb[borders_gt] = 0
+  #matched
+  grb[borders_lab & m2] = 2
+  # unmatched
+  grb[borders_lab & m2c] = 3
+
+  cmap = np.array([trans, blue,green, red], dtype=np.float)
+
+  grb  = cmap[grb.flat].reshape(grb.shape + (4,))
+  
+  res = ax.imshow(img_raw, cmap=plt.cm.Greys_r, **kwargs)
+  res = ax.imshow(grb)
+
+  # Add Overlay
+  # grb = lab_gt.copy()
+  # grb[~m1c] = 0
+  # grb[m2]   = 2
+  # grb[m1c]  = 3
+
+  
+  grb = np.zeros(lab.shape, np.uint16)
+
+  grb[m2c]  = 2
+  grb[m2]  = 1
+
+  cmap = np.array([trans, lightgreen, lightred])
+  grb = cmap[grb.flat].reshape(grb.shape + (4,))
+  res = ax.imshow(grb)
+
+  # grb[~m2c] = 0
+  # grb[m1]   = 2
+  # grb[m2c]  = 3
+
+  return ax
+
+def make_comparison_image_input(img_raw,  lab_gt, ax=None, **kwargs):
+
+  if ax is None:
+    ax = plt.gca()
+  
+  # relabel and color
+
+  grb = lab_gt.copy()
+  ggt = lab_gt.copy()
+    
+  border = find_boundaries(lab_gt, mode = "outer")
+
+  
+  trans      = (0,0,0,0.0)
+  green      = (0,1,0,.7)
+  lightgreen = (0,1,0,.25)
+  red        = (1,0,0,.7)
+  lightred   = (1,0,0,.25)
+  blue       = (0,.4,1,.7)
+  lightblue  = (0,.4,1,0.5)
+
+    
+  # grb[~borders_lab] = 0
+  # # matched
+  # grb[borders_lab & m2] = 1
+  # # unmatched
+  # grb[borders_lab & m2c] = 2
+
+  grb[~border] = 0
+  grb[border] = 1
+
+  cmap = np.array([trans, lightblue,green, red], dtype=np.float)
+
+  grb  = cmap[grb.flat].reshape(grb.shape + (4,))
+  
+  res = ax.imshow(img_raw, cmap=plt.cm.Greys_r, **kwargs)
+  res = ax.imshow(grb)
+
+
   return ax
 
 def voronoi_plot_2d_w_colors(points, colors, **kwargs):
