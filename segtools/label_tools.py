@@ -53,6 +53,7 @@ def pixelgraph_edge_distribution(lab, neibdist=[1,1,1]):
 
     return psg
 
+@DeprecationWarning
 def boundary_image(lab):
     "max value = 2*lab.ndim. works in 2d and 3d."
     res = np.zeros(lab.shape)
