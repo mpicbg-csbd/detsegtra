@@ -119,67 +119,48 @@ def make_comparison_image(img_raw, lab, lab_gt,
   if m2c.sum() > 0:
     lab[m2c] = lab[m2c] - lab[m2c].min() + lab_gt[m1].max() + 1
   lab[m2] = labcopy[m2]
+
+  res = ax.imshow(img_raw, cmap=plt.cm.Greys_r, **kwargs)
+
+  trans= (0,0,0,0)
+  img = np.zeros(lab.shape, np.uint16)
+
+  img[m2]  = 1
+  img[m2c]  = 2
+  img[m1c]  = 3
+
+  cmap = np.array([trans, col_tp, col_fp, col_fp],np.float32)
+  img  = cmap[img.flat].reshape(img_raw.shape + (4,))
+  img[...,-1] *= .2
   
-  # relabel and color
-
-
+  res = ax.imshow(img)
+    # relabel and color
   borders_lab = find_boundaries(lab, mode = "thick")
   borders_gt = find_boundaries(lab_gt)
 
   
-  trans  = (0,0,0,0)
-  
-  
-  # green      = (0,1,0,.7)
-  # lightgreen = (0,1,0,.25)
-  # red        = (1,0,0,.7)
-  # lightred   = (1,0,0,.25)
-  # blue       = (0,.4,1,.7)
-  # lightblue  = (0,.4,1,0.25)
-  # cyan       = (1., 0.41, 0.71,.7)
-
   img = np.zeros(lab.shape, np.uint16)
 
   # draw borders 
   img[~borders_gt] = 0
   img[borders_gt] = 0
+  # unmatched false negatives
   img[borders_gt & m1c] = 4
   #matched
   img[borders_lab & m2] = 2
   # unmatched false positives
   img[borders_lab & m2c] = 3
-  # unmatched false negatives
+
+  trans= (0,0,0,0)
 
   cmap = np.array([trans, trans,col_tp, col_fp, col_fn], dtype=np.float32)
 
-  img  = cmap[img.flat].reshape(img_raw.shape + (4,))
+  img  = cmap[img.flatten()].reshape(img_raw.shape + (4,))
   img[...,-1] *= .7
   
-  print(img[100,100])
-  res = ax.imshow(img_raw, cmap=plt.cm.Greys_r, **kwargs)
   res = ax.imshow(img)
 
-  # Add Overlay
-  # grb = lab_gt.copy()
-  # grb[~m1c] = 0
-  # grb[m2]   = 2
-  # grb[m1c]  = 3
 
-  
-  img = np.zeros(lab.shape, np.uint16)
-
-  img[m2]  = 1
-  img[m2c]  = 2
-
-  cmap = np.array([trans, col_tp, col_fp],np.float32)
-  img  = cmap[img.flat].reshape(img_raw.shape + (4,))
-  img[...,-1] *= .2
-  
-  res = ax.imshow(img)
-
-  # grb[~m2c] = 0
-  # grb[m1]   = 2
-  # grb[m2c]  = 3
 
   return ax
 
