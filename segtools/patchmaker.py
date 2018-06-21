@@ -1,5 +1,152 @@
+from math import ceil, floor
 import numpy as np
 import itertools
+
+
+## high level operations. use slices lists under the hood.
+
+def apply_tiled_kernel(func, arr, border):
+    border = np.array(border)
+    assert len(border)==arr.ndim
+    arrshape = np.array(arr.shape)
+    out = np.zeros(arrshape - border, dtype=arr.dtype)
+    outshape = np.array(out.shape)
+    slices = slices_perfect_covering(outshape, 2*border)
+    for ss in slices:
+      ss2 = translate(ss, border)
+      ss2 = grow(ss2, border)
+      res = func(arr[ss2])
+      ss3 = grow(slice_from_shape(res.shape), -border)
+      out[ss] = res[ss3]
+    return out
+
+## return lists of slices or slice tuples
+
+def slices_perfect_covering(imgshape, sliceshape):
+    "slices at end of each dimension may have smaller size."
+    if not hasattr(sliceshape,'__len__'):
+        sliceshape = [sliceshape] * len(imgshape)
+
+    def f(i): 
+        l = list(range(0,imgshape[i],sliceshape[i])) + [imgshape[i]]
+        l2 = [slice(l[j], l[j+1]) for j in range(len(l)-1)]
+        return l2
+
+    slices = list(itertools.product(*[f(i) for i in range(len(imgshape))]))
+    return slices
+
+def tiled_triplets(shape_unpadded, sliceshape, border):
+    "return list of slice triplets: input, output and container. for tiling operations."
+    border = np.array(border)
+    shape_unpadded = np.array(shape_unpadded)
+    sliceshape = np.array(sliceshape)
+
+    assert len(border)==len(shape_unpadded)
+    slices = slices_perfect_covering(shape_unpadded, sliceshape)
+    def f(ss_container):
+      ss_input = translate(ss_container, border)
+      ss_input = grow(ss_input, border)
+      sh = np.array(shape_from_slice(ss_container))
+      ss_output = translate(slice_from_shape(sh), border)
+      return (ss_input, ss_output, ss_container)
+    triplets = [f(ss) for ss in slices]
+    return triplets
+
+def slices_grid(imgshape, sliceshape, overlap=(0,0,0), offset=(0,0,0)):
+    "slices do no not go beyond boundaries. boundary conditions must be handled separately."
+
+    if not hasattr(sliceshape,'__len__'):
+        sliceshape = [sliceshape] * len(imgshape)
+    if not hasattr(overlap,'__len__'):
+        overlap = [overlap] * len(imgshape)
+    if not hasattr(offset,'__len__'):
+        offset = [offset] * len(imgshape)
+
+    def f(i,n):
+        return slice(i,i+sliceshape[n])
+
+    def g(i):
+        return (offset[i], imgshape[i]-sliceshape[i]+1, sliceshape[i]-overlap[i])
+
+    alist = np.arange(*g(0))
+    blist = np.arange(*g(1))
+    if len(imgshape)==2:
+        it = itertools.product(alist, blist)
+        slices = [[f(i,0), f(j,1)] for i,j in it]
+    elif len(imgshape)==3:
+        clist = np.arange(*g(2))
+        it = itertools.product(alist, blist, clist)
+        slices = [[f(i,0), f(j,1), f(k,2)] for i,j,k in it]
+    
+    return np.array(slices)
+
+## operations on slices
+
+def grow(ss, dx=1):
+    if not hasattr(dx,'__len__'):
+        dx = [dx]*len(ss)
+    ss = list(ss)
+    for i,sl in enumerate(ss):
+        a = sl.start - dx[i]
+        b = sl.stop + dx[i]
+        assert 0 <= a < b
+        ss[i] = slice(a,b,sl.step)
+    return ss
+
+def translate(ss, dx=0):
+    if not hasattr(dx,'__len__'):
+        dx = [dx]*len(ss)
+    ss = list(ss)
+    for i,sl in enumerate(ss):
+        a = sl.start + dx[i]
+        b = sl.stop + dx[i]
+        assert 0 <= a < b
+        ss[i] = slice(a,b,sl.step)
+    return ss
+
+## build single slices
+
+def centered_slice(centerpoint, w=30):
+  ndim = len(centerpoint)
+  if not hasattr(w,'__len__'):
+    w = [w,]*ndim
+  def sd(i):
+    return slice(floor(centerpoint[i]-w[i]), floor(centerpoint[i]+w[i]))
+  ss = [sd(i) for i in range(ndim)]
+  return ss
+
+## convert to/from shape
+
+def shape_from_slice(ss):
+    "note this is not equivalent to img[ss].shape if ss has negative values or step!=1."
+    return tuple([sl.stop-sl.start for sl in ss])
+
+def slice_from_shape(shape):
+  return [slice(0, s) for s in shape]
+
+## tiling utils, don't actually build slices lists.
+
+def patchify(img, patch_shape):
+  """
+  From StackOverflow https://stackoverflow.com/questions/16774148/fast-way-to-slice-image-into-overlapping-patches-and-merge-patches-to-image?noredirect=1&lq=1
+  eg:
+  out = patchify(x, (S,S)).max(axis=(3,4))
+  """
+  a, X, Y, b = img.shape
+  x, y = patch_shape
+  shape = (a, X - x + 1, Y - y + 1, x, y, b)
+  a_str, X_str, Y_str, b_str = img.strides
+  strides = (a_str, X_str, Y_str, X_str, Y_str, b_str)
+  return np.lib.stride_tricks.as_strided(img, shape=shape, strides=strides)
+
+def compute_subblocks(shape, blocksize=100):
+    "for use with the sub_blocks parameter in gputools"
+    if not hasattr(blocksize,'__len__'):
+        blocksize = [blocksize] * len(shape)
+    def f(i): return ceil(shape[i] / blocksize[i])
+    return [f(i) for i in range(len(shape))]
+
+## deprecated. use slices instead of patches.
 
 @DeprecationWarning
 def sample_patches(data, patch_size, n_samples=100, verbose=False):
@@ -21,11 +168,10 @@ def sample_patches(data, patch_size, n_samples=100, verbose=False):
     res = np.stack([data[r[0] - patch_size[0] // 2:r[0] + patch_size[0] - patch_size[0] // 2, r[1] - patch_size[1] // 2:r[1] + patch_size[1] - patch_size[1] // 2] for r in zip(*rand_inds)])
     return res
 
-## get patches from an image given coordinates and patch shapes.
-
 @DeprecationWarning
 def sample_patches_from_img(coords, img, shape, boundary_cond='mirror'):
     """
+    get patches from an image given coordinates and patch shapes.
     TODO: enable boundary conditions on all sides of the img, not just bottom and right.
     """
     y_width, x_width = shape
@@ -44,62 +190,23 @@ def sample_patches_from_img(coords, img, shape, boundary_cond='mirror'):
         patches[m] = img[ind[0]:ind[0]+x_width, ind[1]:ind[1]+y_width]
     return patches
 
-## Different ways of sampling pixel coordinates from an image
-
 @DeprecationWarning
 def random_patch_coords(img, n, shape):
+    "Different ways of sampling pixel coordinates from an image"
     y_width, x_width = shape
     xc = np.random.randint(img.shape[0]-x_width, size=n)
     yc = np.random.randint(img.shape[1]-y_width, size=n)
     return np.stack((xc, yc), axis=1)
 
-## deprecated because we don't want coordinates to depend on patchshape
 @DeprecationWarning
 def regular_patch_coords(img, patchshape, step):
+    "deprecated because we don't want coordinates to depend on patchshape"
     coords = []
     dy, dx = img.shape[0]-patchshape[0], img.shape[1]-patchshape[1]
     for y in range(0,dy,step):
         for x in range(0,dx,step):
             coords.append((y,x))
     return np.array(coords)
-
-
-def slices_grid(imgshape, sliceshape, overlap=(0,0,0), offset=(0,0,0)):
-    "slices do no not go beyond boundaries. boundary conditions must be handled separately."
-
-    def f(i,n):
-        return slice(i,i+sliceshape[n])
-
-    def rng(i):
-        return (offset[i], imgshape[i]-sliceshape[i]+1, sliceshape[i]-overlap[i])
-
-    alist = np.arange(*rng(0))
-    blist = np.arange(*rng(1))
-    if len(imgshape)==2:
-        it = itertools.product(alist, blist)
-        slices = [[f(i,0), f(j,1)] for i,j in it]
-    elif len(imgshape)==3:
-        clist = np.arange(*rng(2))
-        it = itertools.product(alist, blist, clist)
-        slices = [[f(i,0), f(j,1), f(k,2)] for i,j,k in it]
-    
-    return np.array(slices)
-
-def grow(ss, dx=1):
-    if not hasattr(dx,'__len__'):
-        dx = [dx]*len(ss)
-    ss = list(ss)
-    for i,sl in enumerate(ss):
-        a = sl.start - dx[i]
-        b = sl.stop + dx[i]
-        assert 0 <= a < b
-        ss[i] = slice(a,b,sl.step)
-    return ss
-
-def slice_shape(ss):
-    "note this is not equivalent to img[ss].shape if ss has negative values or step!=1."
-    return tuple([sl.stop-sl.start for sl in ss])
-
 
 @DeprecationWarning
 def square_grid_coords(img, step):
@@ -114,12 +221,10 @@ def square_grid_coords(img, step):
     ind = np.transpose(ind)
     return ind
 
-## piece together a single image from a list of coordinates and patches
-
-
 @DeprecationWarning
 def piece_together(patches, coords, imgshape=None, border=0):
     """
+    piece together a single image from a list of coordinates and patches
     patches must all be same shape!
     patches.shape = (sample, x, y, channel) or (sample, x, y)
     coords.shape  = (sample, 2)
@@ -162,7 +267,6 @@ def piece_together(patches, coords, imgshape=None, border=0):
         res = res[:a, :b]
     return res
 
-
 @DeprecationWarning
 def piece_together_ragged_2d(patches, coords):
     """
@@ -185,19 +289,6 @@ def piece_together_ragged_2d(patches, coords):
         patch_img[x:x+dx, y:y+dy] = img
     return patch_img
 
-def patchify(img, patch_shape):
-  """
-  From StackOverflow https://stackoverflow.com/questions/16774148/fast-way-to-slice-image-into-overlapping-patches-and-merge-patches-to-image?noredirect=1&lq=1
-  eg:
-  out = patchify(x, (S,S)).max(axis=(3,4))
-  """
-  a, X, Y, b = img.shape
-  x, y = patch_shape
-  shape = (a, X - x + 1, Y - y + 1, x, y, b)
-  a_str, X_str, Y_str, b_str = img.strides
-  strides = (a_str, X_str, Y_str, X_str, Y_str, b_str)
-  return np.lib.stride_tricks.as_strided(img, shape=shape, strides=strides)
-
 @DeprecationWarning
 def sub_block_apply(func, img, sub_blocks=(1,1,1)):
     """
@@ -215,3 +306,29 @@ def sub_block_apply(func, img, sub_blocks=(1,1,1)):
                 ss = (slice(ar[i], ar[i+1]), slice(br[j], br[j+1]), slice(cr[k], cr[k+1]))
                 res[ss] = func(img[ss])
     return res
+
+
+history = """
+
+## Wed Jun 20 12:54:35 2018
+
+There are a variety of things we want to do with shape and slices.
+Open problems include how to do simple tiling of operations over large images in a way that respects boundary conditions.
+For any operation we should be able to specify a boundary width beyond which the boundary cannot be felt.
+For purely convolutional operations it should be possible to apply them to large images without creating visible seams / tiling artifacts.
+Padding should be done by np.pad, outside of our function. But our function must know the boundary width of the operation to be applied!
+we should have a list of slices triplets:
+    1. enlarged slice for the padded input
+    2. slice into valid region of output
+    3. slice with same shape as 2 mapping into result container.
+        is container padded? we must decide. let's say no.
+    slices do not all need to be same size!
+`tiled_triplets` does this!
+
+## Thu Jun 21 18:51:05 2018
+
+rearrange function order and group into sections.
+
+
+
+"""
