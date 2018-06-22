@@ -2,7 +2,7 @@ import numpy as np
 from .python_utils import flatten
 
 def broadcast_nonscalar_op(op, arr, subaxes, axes_full=None):
-  "op must preserve shape. less general than broadcast_nonscalar_func, but probs faster."
+  "op idx->array must preserve shape of arr[idx]. less general than broadcast_nonscalar_func, but probs faster."
   
   arr = arr.copy()
   
@@ -15,13 +15,13 @@ def broadcast_nonscalar_op(op, arr, subaxes, axes_full=None):
   arr = perm(arr, axes_full, newaxes)
 
   for idx in np.ndindex(arr.shape[:N-M]):
-    arr[idx] = op(arr[idx])
+    arr[idx] = op(idx)
 
   arr = perm(arr, newaxes, axes_full)
   return arr
 
 def broadcast_nonscalar_func(func, arr, subaxes, axes_full=None):
-  "func does not necessarily preserve ndim or shape."
+  "func does not necessarily preserve ndim or shape. must return an array."
   N = arr.ndim
   M = len(subaxes)
   if axes_full is None:
@@ -32,7 +32,7 @@ def broadcast_nonscalar_func(func, arr, subaxes, axes_full=None):
 
   res = np.empty(arr.shape[:N-M],np.ndarray)
   for idx in np.ndindex(arr.shape[:N-M]):
-    res[idx] = func(arr[idx]).tolist()
+    res[idx] = func(idx).tolist()
   res = np.array(res.tolist())
 
   res = perm(res, newaxes, axes_full)
@@ -158,7 +158,6 @@ def sorted_uniques(img):
   a,b = np.unique(img, return_counts=True)
   counts = sorted(zip(a,b), key=lambda c: c[1])
   return counts
-
 
 def argmax3d(img):
   "equivalent to divmod chaining"

@@ -63,6 +63,11 @@ def timing(f):
     return result
   return wrap
 
+def do(iter):
+  return [x for x in iter]
+
+def groupbyn(list0, n):
+  return [list0[i:i+n] for i in range(0, len(list0), n)]
 
 ## uwe's stuff
 
@@ -88,3 +93,13 @@ def pipeline(*steps):
 #     for x in obj:
 #       printtypes(x)
 
+def parse_python_script_comments(filename):
+  lines = open(filename,'r').readlines()
+  block_indices = [i for i,line in enumerate(lines) if '"""' in line]
+  block_indices = groupbyn(block_indices,2)
+  textlist = []
+  for bi in block_indices:
+    varname = lines[bi[0]][:-6] # remove last bit from eg (info = """)
+    vartext = ''.join(lines[bi[0]+1:bi[1]])
+    textlist.append([varname, vartext])
+  return textlist

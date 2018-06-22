@@ -3,6 +3,7 @@ import numpy as np
 import scipy.ndimage as nd
 from scipy.ndimage.morphology import binary_dilation
 # from scipy.ndimage.measurements import find_objects
+from skimage.segmentation import find_boundaries
 from . import nhl_tools
 from numba import jit
 

@@ -29,10 +29,10 @@ class TrackFactory(object):
     def __init__(self, 
                 knn_n            = 3,
                 knn_dub          = 50,
-                neib_edge_cutoff = 40,
-                do_velcorr       = True,
-                velgrad_scale    = 20,
                 edge_scale       = 20,
+                do_velcorr       = True,
+                neib_edge_cutoff = 40,
+                velgrad_scale    = 20,
                 on_edges         = None,
                 ):
 

@@ -6,13 +6,15 @@ import matplotlib
 import matplotlib.pyplot as plt
 plt.ion()
 plt.switch_backend('qt5agg')
+
 import seaborn as sns
+from subprocess import run
 
 ## my local code
 
+from ..cell_view_lib import imshowme
 from .. import spima
-from .. import track_tools
-from .. import nhl_tools
+from .. import track_vis
 
 sys.path.insert(0,'/Users/broaddus/Desktop/Projects/')
 from stackview.stackview import Stack #, StackQt
@@ -22,8 +24,6 @@ import gputools
 
 ## martin's visual stuff
 import spimagine
-
-from subprocess import run
 
 def qopene():
   res = run(['rsync efal:qsave.npy .'], shell=True)

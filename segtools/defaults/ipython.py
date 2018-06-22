@@ -41,7 +41,6 @@ from ..numpy_utils import *
 from ..python_utils import *
 
 
-
 def qsave(x):
   np.save('qsave', x)
 

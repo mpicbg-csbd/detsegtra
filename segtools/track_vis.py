@@ -3,7 +3,7 @@ from stackview.stackview import Stack
 import matplotlib
 
 def draw_flow_current(iss, flowlist):
-    draw_flow(iss, flowlist[min(iss.stack.shape[0]-2, iss.idx[0])])
+    draw_flow(iss, flowlist[:,min(iss.stack.shape[0]-2, iss.idx[0])])
 
 def draw_flow(iss, flow):
     a,b,c = flow.shape
@@ -21,7 +21,8 @@ def draw_flow(iss, flow):
         y0,x0 = origins[i]
         y0,x0 = y0*dy + dy//2, x0*dx + dx//2
         vy,vx = flow[i]
-        ax.arrow(x0,y0,vy,vx,head_width=4, fc='w', ec='w')
+        ax.arrow(x0,y0,vy,vx,width=0.1,head_width=1, head_length=1.0, fc='w', ec='w')
+        # ax.plot([x0,x0+vx],[y0, y0+vy], 'k') #  head_width=4, fc='w', ec='w')
 
 def draw_arrows_current(iss, tr):
     draw_arrows(iss, tr.al[min(iss.stack.shape[0]-2, iss.idx[0])])

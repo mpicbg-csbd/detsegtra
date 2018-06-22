@@ -54,6 +54,19 @@ def twoview(fly, axis=2, stackaxis=1, alpha=1):
   res = np.concatenate((left, right), axis=stackaxis)
   return res
 
+## other projections
+
+def max_three_sides(stack,axis=None):
+  "stack has axes 'ZYX'"
+  assert stack.shape[0] == stack.shape[1] == stack.shape[2]
+  yx = stack.max(0)
+  zx = stack.max(1)
+  zy = stack.max(2)
+  if axis is None:
+    return np.array([yx,zx,zy])
+  else:
+    return np.concatenate([yx,zx,zy],axis)
+
 ## image-indexing
 
 @jit
