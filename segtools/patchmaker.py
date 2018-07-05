@@ -22,13 +22,18 @@ def apply_tiled_kernel(func, arr, border):
 
 ## return lists of slices or slice tuples
 
-def slices_perfect_covering(imgshape, sliceshape):
-    "slices at end of each dimension may have smaller size."
+def slices_grid(imgshape, sliceshape, coverall=False):
+    """
+    accept imghsape of arbitrary dimension.
+    if coverall==True then slices are perfect covering of image, even if that means heterogeneous shapes.
+    """
     if not hasattr(sliceshape,'__len__'):
         sliceshape = [sliceshape] * len(imgshape)
 
-    def f(i): 
-        l = list(range(0,imgshape[i],sliceshape[i])) + [imgshape[i]]
+    def f(i):
+        l = list(range(0,imgshape[i],sliceshape[i]))
+        if coverall or imgshape[i]%sliceshape[i]==0:
+            l += [imgshape[i]]
         l2 = [slice(l[j], l[j+1]) for j in range(len(l)-1)]
         return l2
 
@@ -52,7 +57,10 @@ def tiled_triplets(shape_unpadded, sliceshape, border):
     triplets = [f(ss) for ss in slices]
     return triplets
 
-def slices_grid(imgshape, sliceshape, overlap=(0,0,0), offset=(0,0,0)):
+
+
+@DeprecationWarning
+def slices_grid_old(imgshape, sliceshape, overlap=(0,0,0), offset=(0,0,0)):
     "slices do no not go beyond boundaries. boundary conditions must be handled separately."
 
     if not hasattr(sliceshape,'__len__'):
@@ -70,6 +78,8 @@ def slices_grid(imgshape, sliceshape, overlap=(0,0,0), offset=(0,0,0)):
 
     alist = np.arange(*g(0))
     blist = np.arange(*g(1))
+    slices = list(itertools.product(*[f(i) for i in range(len(imgshape))]))
+
     if len(imgshape)==2:
         it = itertools.product(alist, blist)
         slices = [[f(i,0), f(j,1)] for i,j in it]

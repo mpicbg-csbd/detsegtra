@@ -55,7 +55,30 @@ def add_z_to_chan(img, dz, ind=None, axes="ZCYX"):
 
   return res
 
-
+def weighted_categorical_crossentropy(classweights=(1., 1.), itd=1, BEnd=K):
+    """
+    last channel of y_pred gives pixelwise weights
+    """
+    classweights = np.array(classweights)
+    mean = BEnd.mean
+    log  = BEnd.log
+    summ = BEnd.sum
+    eps  = K.epsilon()
+    if itd==0:
+        ss = [slice(None), slice(None), slice(None), slice(None)]
+    else:
+        ss = [slice(None), slice(itd,-itd), slice(itd,-itd), slice(None)]
+    def catcross(y_true, y_pred):
+        yt = y_true[ss]
+        yp = y_pred[ss]
+        ws = yt[...,-1]
+        yt = yt[...,:-1]
+        ce = ws[...,np.newaxis] * yt * log(yp + eps)
+        ce = mean(ce, axis=(0,1,2))
+        result = classweights * ce
+        result = -summ(result)
+        return result
+    return catcross
 
 def my_categorical_crossentropy(weights=(1., 1.), itd=1, BEnd=K):
     """
