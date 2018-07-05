@@ -53,14 +53,38 @@ newcents = []
 def onclick_centerpoints(event):
   xi, yi = int(event.xdata + 0.5), int(event.ydata + 0.5)
   zi = iss.idx[0]
-  print('button=%d, x=%d, y=%d, xdata=%f, ydata=%f' %
-      (event.button, event.x, event.y, event.xdata, event.ydata))
+  print('button=%d, x=%d, y=%d, xdata=%f, ydata=%f' % (event.button, event.x, event.y, event.xdata, event.ydata))
   print(zi, yi, xi)
   if event.key=='C':
     print('added! ', event.key)
     newcents.append([zi,yi,xi])
+
 # cid = iss.fig.canvas.mpl_connect('button_press_event', onclick_centerpoints)
 
+def open_in_preview(*args, normed=True, rm_old=True):
+  "save all arrays and open in preview"
+  def norm(img): img = (img-img.min())/(img.max() - img.min()); return img;
+  dir0 = Path('imshow')
+  dir0.mkdir(exist_ok=True)
+  if rm_old:
+    for d in dir0.iterdir():
+      os.remove(d)
+  def a():
+    g = glob('imshow/*.png')
+    if len(g)==0: return 0
+    s = sorted(g)[-1][-7:-4]
+    n = int(s)
+    print(g,s,n)
+    return n
+  number = a()
+  print(number)
+  for i,arr in enumerate(args):
+    # if 'float' in str(arr.dtype):
+    if normed==True:
+      arr = norm(arr)
+    io.imsave(dir0 / 'img{:03d}.png'.format(i + number + 1), arr)
+  cmd = "open -a preview imshow"
+  res = run([cmd], shell=True)  
 
 
 

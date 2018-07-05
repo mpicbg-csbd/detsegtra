@@ -14,8 +14,8 @@ from . import nhl_tools
 from keras.activations import softmax
 from keras.models import Model
 from keras.layers import Convolution2D
-from keras.layers import Input, MaxPooling2D, UpSampling2D, Reshape, core, Dropout
-from keras.layers.convolutional import Conv2D
+from keras.layers import Input, MaxPooling2D, MaxPooling3D, UpSampling2D, UpSampling3D, Reshape, core, Dropout
+from keras.layers.convolutional import Conv2D, Conv3D
 from keras.layers.merge import Concatenate
 from keras.optimizers import Adam, SGD
 from keras.callbacks import ModelCheckpoint, LearningRateScheduler, EarlyStopping, TensorBoard
@@ -55,15 +55,13 @@ def add_z_to_chan(img, dz, ind=None, axes="ZCYX"):
 
   return res
 
-
-
-def my_categorical_crossentropy(weights=(1., 1.), itd=1, BEnd=K):
+def my_categorical_crossentropy(classweights=(1., 1.), itd=1, BEnd=K):
     """
-    NOTE: The default weights assumes 2 classes, but the loss works for arbitrary classes if we simply change the length of the weights arg.
+    NOTE: The default classweights assumes 2 classes, but the loss works for arbitrary classes if we simply change the length of the classweights arg.
     
     Also, we can replace K with numpy to get a function we can actually evaluate (not just pass to compile)!
     """
-    weights = np.array(weights)
+    classweights = np.array(classweights)
     mean = BEnd.mean
     log  = BEnd.log
     summ = BEnd.sum
@@ -77,32 +75,59 @@ def my_categorical_crossentropy(weights=(1., 1.), itd=1, BEnd=K):
         yp = y_pred[ss]
         ce = yt * log(yp + eps)
         ce = mean(ce, axis=(0,1,2))
-        result = weights * ce
+        result = classweights * ce
         result = -summ(result)
         return result
     return catcross
 
+
+
 def get_unet_n_pool(n_pool=2, inputchan=1, n_classes=2, n_convolutions_first_layer=32, 
-                    dropout_fraction=0.2, last_activation='softmax', kern_width=3):
+                    dropout_fraction=0.2, last_activation='softmax', kern_width=3, ndim=2):
     """
     The info travel distance is given by info_travel_dist(n_pool, kern_width)
     """
 
     if K.image_dim_ordering() == 'th':
-      inputs = Input((inputchan, None, None))
+      if ndim==2:
+        inputs = Input((inputchan, None, None))
+      elif ndim==3:
+        inputs = Input((inputchan, None, None, None))
       concatax = 1
       chan = 'channels_first'
     elif K.image_dim_ordering() == 'tf':
-      inputs = Input((None, None, inputchan))
-      concatax = 3
+      if ndim==2:
+        inputs = Input((None, None, inputchan))
+      elif ndim==3:
+        inputs = Input((None, None, None, inputchan))
+      concatax = 3 + ndim - 2
       chan = 'channels_last'
 
+    if ndim==2:
+        Convnd  = Conv2D
+        Poolnd  = MaxPooling2D
+        Upcatnd = UpSampling2D
+        convsize = (kern_width, kern_width)
+        poolsize = (2,2)
+        upsampsize = (2,2)
+        finalconvsize = (1, 1)
+        permdims = (2,3,1)
+    elif ndim==3:
+        Convnd  = Conv3D
+        Poolnd  = MaxPooling3D
+        Upcatnd = UpSampling3D
+        convsize = (kern_width, kern_width, kern_width)
+        poolsize = (2,2,2)
+        upsampsize = (2,2,2)
+        finalconvsize = (1, 1, 1)
+        permdims = (2,3,4,1)
+
     def Conv(w):
-        return Conv2D(w, (kern_width,kern_width), padding='same', data_format=chan, activation='relu', kernel_initializer='he_normal')
+        return Convnd(w, convsize, padding='same', data_format=chan, activation='relu', kernel_initializer='he_normal')
     def Pool():
-        return MaxPooling2D(pool_size=(2,2), data_format=chan)
+        return Poolnd(pool_size=poolsize, data_format=chan)
     def Upsa():
-        return UpSampling2D(size=(2,2), data_format=chan)
+        return Upcatnd(size=upsampsize, data_format=chan)
     
     d = dropout_fraction
     
@@ -159,9 +184,9 @@ def get_unet_n_pool(n_pool=2, inputchan=1, n_classes=2, n_convolutions_first_lay
         up = uacdc(s, up, conv)
 
     # final (1,1) convolutions and activation
-    acti_layer = Conv2D(n_classes, (1, 1), padding='same', data_format=chan, activation=None)(up)
+    acti_layer = Convnd(n_classes, finalconvsize, padding='same', data_format=chan, activation=None)(up)
     if K.image_dim_ordering() == 'th':
-        acti_layer = core.Permute((2,3,1))(acti_layer)
+        acti_layer = core.Permute(permdims)(acti_layer)
     acti_layer = core.Activation(last_activation)(acti_layer)
     model = Model(inputs=inputs, outputs=acti_layer)
     return model

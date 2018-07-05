@@ -302,7 +302,6 @@ def _voronoi_finite_polygons_2d(vor, radius=None):
 
     return new_regions, np.asarray(new_vertices)
 
-
 def fig2data(fig, shape):
   "https://stackoverflow.com/questions/35355930/matplotlib-figure-to-image-as-a-numpy-array"
   from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
