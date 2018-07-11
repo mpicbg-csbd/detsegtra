@@ -24,7 +24,12 @@ from keras.utils import np_utils
 from keras.preprocessing.image import ImageDataGenerator
 
 
-
+def reset_weights(model):
+    "https://www.codementor.io/nitinsurya/how-to-re-initialize-keras-model-weights-et41zre2g"
+    session = K.get_session()
+    for layer in model.layers: 
+        if hasattr(layer, 'kernel_initializer'):
+            layer.kernel.initializer.run(session=session)
 
 def add_z_to_chan(img, dz, ind=None, axes="ZCYX"):
   assert img.ndim == 4
@@ -71,10 +76,10 @@ def weighted_categorical_crossentropy(classweights=(1., 1.), itd=1, BEnd=K):
     def catcross(y_true, y_pred):
         yt = y_true[ss]
         yp = y_pred[ss]
-        ws = yt[...,-1]
+        ws = yt[..., -1]
         yt = yt[...,:-1]
         ce = ws[...,np.newaxis] * yt * log(yp + eps)
-        ce = mean(ce, axis=(0,1,2))
+        ce = summ(ce, axis=(0,1,2)) / summ(ws) #* np.sum(ws) / np.size(ws)
         result = classweights * ce
         result = -summ(result)
         return result
@@ -107,24 +112,17 @@ def my_categorical_crossentropy(classweights=(1., 1.), itd=1, BEnd=K):
 
 
 
-def get_unet_n_pool(n_pool=2, inputchan=1, n_classes=2, n_convolutions_first_layer=32, 
-                    dropout_fraction=0.2, last_activation='softmax', kern_width=3, ndim=2):
+def get_unet_n_pool(input0, n_pool=2, n_convolutions_first_layer=32,
+                    dropout_fraction=0.2, kern_width=3):
     """
     The info travel distance is given by info_travel_dist(n_pool, kern_width)
     """
+    ndim = len(input0.shape)-2
 
     if K.image_dim_ordering() == 'th':
-      if ndim==2:
-        inputs = Input((inputchan, None, None))
-      elif ndim==3:
-        inputs = Input((inputchan, None, None, None))
       concatax = 1
       chan = 'channels_first'
     elif K.image_dim_ordering() == 'tf':
-      if ndim==2:
-        inputs = Input((None, None, inputchan))
-      elif ndim==3:
-        inputs = Input((None, None, None, inputchan))
       concatax = 3 + ndim - 2
       chan = 'channels_last'
 
@@ -135,8 +133,6 @@ def get_unet_n_pool(n_pool=2, inputchan=1, n_classes=2, n_convolutions_first_lay
         convsize = (kern_width, kern_width)
         poolsize = (2,2)
         upsampsize = (2,2)
-        finalconvsize = (1, 1)
-        permdims = (2,3,1)
     elif ndim==3:
         Convnd  = Conv3D
         Poolnd  = MaxPooling3D
@@ -144,8 +140,6 @@ def get_unet_n_pool(n_pool=2, inputchan=1, n_classes=2, n_convolutions_first_lay
         convsize = (kern_width, kern_width, kern_width)
         poolsize = (2,2,2)
         upsampsize = (2,2,2)
-        finalconvsize = (1, 1, 1)
-        permdims = (2,3,4,1)
 
     def Conv(w):
         return Convnd(w, convsize, padding='same', data_format=chan, activation='relu', kernel_initializer='he_normal')
@@ -184,7 +178,7 @@ def get_unet_n_pool(n_pool=2, inputchan=1, n_classes=2, n_convolutions_first_lay
 
     # the first conv comes from the inputs
     s = n_convolutions_first_layer
-    conv, pool = cdcp(s, inputs)
+    conv, pool = cdcp(s, input0)
     conv_layers.append(conv)
 
     # then the recursively describeable contracting part
@@ -208,13 +202,20 @@ def get_unet_n_pool(n_pool=2, inputchan=1, n_classes=2, n_convolutions_first_lay
         s = s//2
         up = uacdc(s, up, conv)
 
-    # final (1,1) convolutions and activation
-    acti_layer = Convnd(n_classes, finalconvsize, padding='same', data_format=chan, activation=None)(up)
-    if K.image_dim_ordering() == 'th':
-        acti_layer = core.Permute(permdims)(acti_layer)
+    return up
+
+def acti(input0, n_classes, last_activation='softmax'):
+    "final (1,1) convolutions and activation"
+    ndim = len(input0.shape)-2
+    if ndim==2:
+        Convnd  = Conv2D
+        finalconvsize = (1,1)
+    elif ndim==3:
+        Convnd  = Conv3D
+        finalconvsize = (1,1,1)
+    acti_layer = Convnd(n_classes, finalconvsize, padding='same', activation=None)(input0)
     acti_layer = core.Activation(last_activation)(acti_layer)
-    model = Model(inputs=inputs, outputs=acti_layer)
-    return model
+    return acti_layer
 
 def info_travel_dist(n_maxpool, conv=3):
     """
@@ -315,8 +316,9 @@ def batch_generator_patches_aug(X, Y,
                 Ybatch[i] = y
 
             if epoch==1 and savepath is not None:
-                Xepoch.append(Xbatch)
-                Yepoch.append(Ybatch)
+                if Xbatch.shape[0]==batch_size: ## ignore last frame
+                    Xepoch.append(Xbatch)
+                    Yepoch.append(Ybatch)
 
             # io.imsave('Xauged.tif', Xbatch.astype('float32'), plugin='tifffile')
             # io.imsave('Yauged.tif', Ybatch.astype('float32'), plugin='tifffile')
@@ -327,7 +329,11 @@ def batch_generator_patches_aug(X, Y,
             yield Xbatch, Ybatch
 
         if epoch==1 and savepath is not None:
-            np.savez(savepath / 'XY_train', x=np.array(Xepoch), y=np.array(Yepoch))
+            x = np.array(Xepoch)
+            y = np.array(Yepoch)
+            print(x.shape)
+            print(y.shape)
+            np.savez(str(savepath / 'XY_train'), x=x, y=y)
 
 def batch_generator_pred_zchannel(X,
                         # steps_per_epoch=100,

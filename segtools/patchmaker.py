@@ -20,25 +20,81 @@ def apply_tiled_kernel(func, arr, border):
       out[ss] = res[ss3]
     return out
 
+
+## starts and ends api
+
+def starts(gridshape, stride, patchshape):
+    stride = np.array(stride)
+    patchshape = np.array(patchshape)
+
+    starts = np.indices(gridshape)
+    s0 = [1,]*starts.ndim
+    s0[0] = starts.shape[0]
+    starts = starts * stride.reshape(s0)
+    return starts
+
+def se2slices(s,e):
+    return [slice(s[j],e[j]) for j in range(len(s))]
+
+def starts_ends_to_slices(starts,ends):
+    s0 = np.array(starts.shape)
+    if starts.ndim > 2:
+        starts = starts.reshape([s0[0], s0[1:].prod()]).T
+        ends = ends.reshape([s0[0], s0[1:].prod()]).T
+        print(starts.shape, ends.shape)
+    assert s0[0] > s0[1]
+    n = starts.shape[0]
+    return [se2slices(starts[i], ends[i]) for i in range(n)]
+
 ## return lists of slices or slice tuples
 
-def slices_grid(imgshape, sliceshape, coverall=False):
+def slices_heterostride(imgshape, sliceshape, nslices=None):
+    if nslices is None:
+        nslices = np.ceil(np.array(imgshape) / np.array(sliceshape))
+
+    n = len(imgshape)
+
+    def f(i):
+        l = np.linspace(0,imgshape[i]-sliceshape[i],nslices[i])
+        l += 0.5
+        l = np.floor(l).astype(np.int)
+        l = [slice(li, li+sliceshape[i]) for li in l]
+        return l
+
+    slices = [f(i) for i in range(n)]
+    print([len(s) for s in slices])
+    slices = list(itertools.product(*slices))
+    return slices
+
+def coverage(imgshape, slices):
+    coverage = np.zeros(imgshape)
+    for ss in slices:
+        coverage[ss] += 1
+    return coverage, {'mean':coverage.mean(), 'uniq':np.unique(coverage)}
+
+def slices_grid(imgshape, sliceshape, stride=None, allow_hetero=False):
     """
     accept imghsape of arbitrary dimension.
-    if coverall==True then slices are perfect covering of image, even if that means heterogeneous shapes.
+    if allow_hetero==True then slices are perfect covering of image, even if that means heterogeneous shapes.
     """
+    if stride is None:
+        stride = sliceshape
+
     if not hasattr(sliceshape,'__len__'):
         sliceshape = [sliceshape] * len(imgshape)
 
+    n = len(imgshape)
+
     def f(i):
-        l = list(range(0,imgshape[i],sliceshape[i]))
-        if coverall or imgshape[i]%sliceshape[i]==0:
-            l += [imgshape[i]]
-        l2 = [slice(l[j], l[j+1]) for j in range(len(l)-1)]
+        l = list(range(0,imgshape[i]+1-sliceshape[i],stride[i]))
+        extra = sliceshape[i] + stride[i]*(len(l)-1) - imgshape[i]
+        l2 = [slice(lj, lj+sliceshape[i]) for lj in l]
         return l2
 
-    slices = list(itertools.product(*[f(i) for i in range(len(imgshape))]))
-    return slices
+    sl1 = [f(i) for i in range(n)]
+    extra = [sliceshape[i] + stride[i]*(len(sl1[i])-1) - imgshape[i] for i in range(n)]
+    slices = list(itertools.product(*sl1))
+    return slices, extra
 
 def tiled_triplets(shape_unpadded, sliceshape, border):
     "return list of slice triplets: input, output and container. for tiling operations."
@@ -47,7 +103,7 @@ def tiled_triplets(shape_unpadded, sliceshape, border):
     sliceshape = np.array(sliceshape)
 
     assert len(border)==len(shape_unpadded)
-    slices = slices_perfect_covering(shape_unpadded, sliceshape)
+    slices = slices_grid(shape_unpadded, sliceshape)
     def f(ss_container):
       ss_input = translate(ss_container, border)
       ss_input = grow(ss_input, border)
@@ -57,6 +113,16 @@ def tiled_triplets(shape_unpadded, sliceshape, border):
     triplets = [f(ss) for ss in slices]
     return triplets
 
+def make_triplets(slices, border):
+    "given a list of container slices, return triplet with matching input/output slices."
+    def f(ss_container):
+      ss_input = translate(ss_container, border)
+      ss_input = grow(ss_input, border)
+      sh = np.array(shape_from_slice(ss_container))
+      ss_output = translate(slice_from_shape(sh), border)
+      return (ss_input, ss_output, ss_container)
+    triplets = [f(ss) for ss in slices]
+    return triplets
 
 
 @DeprecationWarning
@@ -133,6 +199,33 @@ def shape_from_slice(ss):
 
 def slice_from_shape(shape):
   return [slice(0, s) for s in shape]
+
+## other utils
+
+def perfect_padding(imgsize, patchsize, minpad=None):
+    n = len(patchsize)
+    mods = [imgsize[i] % patchsize[i] for i in range(n)]
+    p = patchsize
+    m = mods
+
+    def fixmin(x,i):
+        while x < minpad[i]:
+            x += patchsize[i]
+        return x
+
+    def f(i):
+        if m[i]==0:
+            l,r = 0,0
+        else:
+            l,r = (p[i] - m[i]//2, p[i] - (m[i]-m[i]//2))
+        l = fixmin(l,i)
+        r = fixmin(r,i)
+        return l,r
+
+    pads = [f(i) for i in range(n)]
+    dif = len(imgsize) - len(pads)
+    if dif > 0: pads += [(0,0)]*dif
+    return pads
 
 ## tiling utils, don't actually build slices lists.
 
@@ -339,6 +432,61 @@ we should have a list of slices triplets:
 
 rearrange function order and group into sections.
 
+## Thu Jul  5 15:41:34 2018
+
+combine slices_perfect_covering and slices_grid into one function.
+    works for any dimension.
+    works as always perfect covering OR homogeneous patch size mode.
+
+How should we approach tiled triplets?
+Should it also have the option for enforcing homogeneous patch size vs perfect covering?
+Should this call slices_grid under the hood? should we let the user call slices grid and we just turn
+slices grid into a list of appropriate slice triplets? Yes, this gives us direct control over slices
+without having to pass params deep down into functions.
+
+Sat Jul  7 13:34:57 2018
+
+Here's how I think about slices and padding currently.
+
+1. Don't worry about border effects of applied functions when making slices.
+Slices should be allowed to overlap. We should be able to control slice shape and stride
+independently. Slices with fixed stride must also return a list of ints for the extra pixels covered
+by the patches in each dimension. Can be positive if stride extends beyond image bounds or negative
+if stride doesn't reach image edge. With perfect grid / const striding a single int is sufficient to 
+describe and entire dimension. This list of ints, if positive, could be used to add padding to the
+end of each image dimension in order to allow patches of constant size.
+Another way of getting patches of constant shape while still covering every pixel at least once
+is to allow the stride to vary across the image. We might want that the stride is constant until the
+very last slice, which then overlaps heavily with the previous slice, or we might want that the stride
+varies a small amount between each consecutive pair of slices.
+
+desireable properties:
+- no need to pad twice
+- slice properties hold immediately, no need to pad *afterwards*.
+- this means we *have* to pad correctly and properly *before* we compute slices, or join the
+two operations.
+
+- note: memory could increase dramatically if we have a large sliceshape, small stride and a large boundary.
+- to avoid memory increase we could only feed in slices via a generator.
+
+- the ability to avoid applying padding twice.
+Ideally we would wouldn't have to first pad the image, then compute slices, then add extra padding so
+that the slices actually fit perfectly into the image.
+- separate functions which return slices of constant shape from those that have varied shape.
+    - If we want the total coverage of the image to be exactly 1 everywhere and we're not willing
+    to pad the image, then we must allow for heterogeneous slice shapes.
+    - If we want coverage==1 everywhere and we want homogeneous slice shapes, then we must pad.
+    - We want these properties to hold *immediately*, not just *after we pad the image*.
+    - This means the function should also do the padding for us.
+    - If we're concerned that padding requires too much memory then we can build a generator that
+    returns only ndarrays of a fixed shape, and that maps a slice of the array to a slice of the full image.
+
+use case:
+- I want to apply a convnet to an image without seeing border effects in the middle of the image.
+- I want to build training data xs,ys and ws.
+    - 2D case where I want stride < patchshape and i want to collapse z dim into channels.
+        - Here i also want a small amount of overlap between patches.
+    - 3D case where I want some overlap between neighboring patches dues to boundary effects.
 
 
 """
