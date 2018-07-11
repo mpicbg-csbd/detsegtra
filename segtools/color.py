@@ -74,6 +74,8 @@ def recolor_from_mapping(lab, mapping):
   mapping can be a dictionary of int->value
   value can be int,uint or float type, can be scalar or vector
   """
+  assert lab.max() > 0
+  assert len(list(mapping.values())) > 0
   maxlabel = lab.max().astype('int')
   somevalue = list(mapping.values())[0]
   if hasattr(somevalue, '__len__'):
