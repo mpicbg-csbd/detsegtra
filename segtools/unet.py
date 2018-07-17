@@ -24,37 +24,6 @@ from keras.utils import np_utils
 from keras.preprocessing.image import ImageDataGenerator
 
 
-
-
-def add_z_to_chan(img, dz, ind=None, axes="ZCYX"):
-  assert img.ndim == 4
-
-  ## by default do the entire stack
-  if ind is None:
-    ind = np.arange(img.shape[0])
-
-  ## pad img
-  img = perm(img, axes, "ZCYX")
-  pad = [(dz,dz)] + [(0,0)]*3
-  img = np.pad(img, pad, 'reflect')
-
-  ## allow single ind
-  if not hasattr(ind, "__len__"):
-    ind = [ind]
-
-  def add_single(i):
-    res = img[i-dz:i+dz+1]
-    a,b,c,d = res.shape
-    res = res.reshape((a*b,c,d))
-    res = perm(res, "CYX", "YXC")
-    return res
-
-  ind = np.array(ind) + dz
-  res = np.stack([add_single(i) for i in ind], axis=0)
-  res = perm(res, "ZYXC", axes)
-
-  return res
-
 def weighted_categorical_crossentropy(classweights=(1., 1.), itd=1, BEnd=K):
     """
     last channel of y_pred gives pixelwise weights
@@ -71,10 +40,10 @@ def weighted_categorical_crossentropy(classweights=(1., 1.), itd=1, BEnd=K):
     def catcross(y_true, y_pred):
         yt = y_true[ss]
         yp = y_pred[ss]
-        ws = yt[...,-1]
+        ws = yt[..., -1]
         yt = yt[...,:-1]
         ce = ws[...,np.newaxis] * yt * log(yp + eps)
-        ce = mean(ce, axis=(0,1,2))
+        ce = summ(ce, axis=(0,1,2)) / summ(ws) #* np.sum(ws) / np.size(ws)
         result = classweights * ce
         result = -summ(result)
         return result
@@ -105,26 +74,17 @@ def my_categorical_crossentropy(classweights=(1., 1.), itd=1, BEnd=K):
         return result
     return catcross
 
-
-
-def get_unet_n_pool(n_pool=2, inputchan=1, n_classes=2, n_convolutions_first_layer=32, 
-                    dropout_fraction=0.2, last_activation='softmax', kern_width=3, ndim=2):
+def get_unet_n_pool(input0, n_pool=2, n_convolutions_first_layer=32,
+                    dropout_fraction=0.2, kern_width=3):
     """
     The info travel distance is given by info_travel_dist(n_pool, kern_width)
     """
+    ndim = len(input0.shape)-2
 
     if K.image_dim_ordering() == 'th':
-      if ndim==2:
-        inputs = Input((inputchan, None, None))
-      elif ndim==3:
-        inputs = Input((inputchan, None, None, None))
       concatax = 1
       chan = 'channels_first'
     elif K.image_dim_ordering() == 'tf':
-      if ndim==2:
-        inputs = Input((None, None, inputchan))
-      elif ndim==3:
-        inputs = Input((None, None, None, inputchan))
       concatax = 3 + ndim - 2
       chan = 'channels_last'
 
@@ -135,8 +95,6 @@ def get_unet_n_pool(n_pool=2, inputchan=1, n_classes=2, n_convolutions_first_lay
         convsize = (kern_width, kern_width)
         poolsize = (2,2)
         upsampsize = (2,2)
-        finalconvsize = (1, 1)
-        permdims = (2,3,1)
     elif ndim==3:
         Convnd  = Conv3D
         Poolnd  = MaxPooling3D
@@ -144,8 +102,6 @@ def get_unet_n_pool(n_pool=2, inputchan=1, n_classes=2, n_convolutions_first_lay
         convsize = (kern_width, kern_width, kern_width)
         poolsize = (2,2,2)
         upsampsize = (2,2,2)
-        finalconvsize = (1, 1, 1)
-        permdims = (2,3,4,1)
 
     def Conv(w):
         return Convnd(w, convsize, padding='same', data_format=chan, activation='relu', kernel_initializer='he_normal')
@@ -184,7 +140,7 @@ def get_unet_n_pool(n_pool=2, inputchan=1, n_classes=2, n_convolutions_first_lay
 
     # the first conv comes from the inputs
     s = n_convolutions_first_layer
-    conv, pool = cdcp(s, inputs)
+    conv, pool = cdcp(s, input0)
     conv_layers.append(conv)
 
     # then the recursively describeable contracting part
@@ -208,13 +164,20 @@ def get_unet_n_pool(n_pool=2, inputchan=1, n_classes=2, n_convolutions_first_lay
         s = s//2
         up = uacdc(s, up, conv)
 
-    # final (1,1) convolutions and activation
-    acti_layer = Convnd(n_classes, finalconvsize, padding='same', data_format=chan, activation=None)(up)
-    if K.image_dim_ordering() == 'th':
-        acti_layer = core.Permute(permdims)(acti_layer)
-    acti_layer = core.Activation(last_activation)(acti_layer)
-    model = Model(inputs=inputs, outputs=acti_layer)
-    return model
+    return up
+
+def acti(input0, n_classes, last_activation='softmax', **kwargs):
+    "final (1,1) convolutions and activation"
+    ndim = len(input0.shape)-2
+    if ndim==2:
+        Convnd  = Conv2D
+        finalconvsize = (1,1)
+    elif ndim==3:
+        Convnd  = Conv3D
+        finalconvsize = (1,1,1)
+    acti_layer = Convnd(n_classes, finalconvsize, padding='same', activation=None)(input0)
+    acti_layer = core.Activation(last_activation, **kwargs)(acti_layer)
+    return acti_layer
 
 def info_travel_dist(n_maxpool, conv=3):
     """
@@ -273,9 +236,10 @@ def batch_generator_patches(X, Y, train_params, verbose=False):
             batchnum += 1
             yield Xbatch, Ybatch
 
-def batch_generator_patches_aug(X, Y, 
+def batch_generator_patches_aug(X, Y,
                                 # steps_per_epoch=100,
                                 batch_size=4,
+                                net=None,
                                 augment_and_norm=lambda x,y:(x,y),
                                 verbose=False,
                                 savepath=None):
@@ -290,17 +254,19 @@ def batch_generator_patches_aug(X, Y,
         batchnum = 0
         inds = np.arange(X.shape[0])
         np.random.shuffle(inds)
-        X = X[inds]
-        Y = Y[inds]
-        # while batchnum < steps_per_epoch:
+        # X = Xin[inds]
+        # Y = Yin[inds]
 
         Xepoch = []
         Yepoch = []
+
+        if net is not None:
+            pred_xs = net.predict(X[[0,10,50]], batch_size=1)
         
         while current_idx < X.shape[0]:
             i0 = current_idx
             i1 = min(current_idx + batch_size, X.shape[0])
-            Xbatch, Ybatch = X[i0:i1].copy(), Y[i0:i1].copy()
+            Xbatch, Ybatch = X[inds][i0:i1].copy(), Y[inds][i0:i1].copy()
             # io.imsave('X.tif', Xbatch, plugin='tifffile')
             # io.imsave('Y.tif', Ybatch, plugin='tifffile')
 
@@ -315,8 +281,10 @@ def batch_generator_patches_aug(X, Y,
                 Ybatch[i] = y
 
             if epoch==1 and savepath is not None:
-                Xepoch.append(Xbatch)
-                Yepoch.append(Ybatch)
+                if Xbatch.shape[0]==batch_size: ## ignore last frame
+                    Xepoch.append(Xbatch)
+                    Yepoch.append(Ybatch)
+
 
             # io.imsave('Xauged.tif', Xbatch.astype('float32'), plugin='tifffile')
             # io.imsave('Yauged.tif', Ybatch.astype('float32'), plugin='tifffile')
@@ -327,7 +295,11 @@ def batch_generator_patches_aug(X, Y,
             yield Xbatch, Ybatch
 
         if epoch==1 and savepath is not None:
-            np.savez(savepath / 'XY_train', x=np.array(Xepoch), y=np.array(Yepoch))
+            x = np.array(Xepoch)
+            y = np.array(Yepoch)
+            print(x.shape)
+            print(y.shape)
+            np.savez(str(savepath / 'XY_train'), x=x, y=y)
 
 def batch_generator_pred_zchannel(X,
                         # steps_per_epoch=100,

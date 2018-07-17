@@ -6,6 +6,8 @@ import collections
 from collections import Counter
 from tabulate import tabulate
 from math import floor, ceil
+from pathlib import Path
+from glob import glob
 
 
 flatten = lambda l: [item for sublist in l for item in sublist]
@@ -119,3 +121,12 @@ def parse_python_script_comments(filename):
     vartext = ''.join(lines[bi[0]+1:bi[1]])
     textlist.append([varname, vartext])
   return textlist
+
+def glob_and_parse_filename(globname, n=3):
+  try:
+    lastfile = Path(sorted(glob(globname))[-1])
+    lastfile_number = int(lastfile.stem[-n:])
+    return lastfile_number
+  except IndexError as e:
+    print(e)
+    return None
