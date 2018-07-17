@@ -2,36 +2,7 @@ from math import ceil, floor
 import numpy as np
 import itertools
 
-
-## high level operations. use slices lists under the hood.
-
-def apply_tiled_kernel(func, arr, border):
-    border = np.array(border)
-    assert len(border)==arr.ndim
-    arrshape = np.array(arr.shape)
-    out = np.zeros(arrshape - border, dtype=arr.dtype)
-    outshape = np.array(out.shape)
-    slices = slices_perfect_covering(outshape, 2*border)
-    for ss in slices:
-      ss2 = translate(ss, border)
-      ss2 = grow(ss2, border)
-      res = func(arr[ss2])
-      ss3 = grow(slice_from_shape(res.shape), -border)
-      out[ss] = res[ss3]
-    return out
-
-
-## starts and ends api
-
-def starts(gridshape, stride, patchshape):
-    stride = np.array(stride)
-    patchshape = np.array(patchshape)
-
-    starts = np.indices(gridshape)
-    s0 = [1,]*starts.ndim
-    s0[0] = starts.shape[0]
-    starts = starts * stride.reshape(s0)
-    return starts
+## utils: converts starting/ending index pairs into lists of slices
 
 def se2slices(s,e):
     return [slice(s[j],e[j]) for j in range(len(s))]
@@ -42,119 +13,100 @@ def starts_ends_to_slices(starts,ends):
         starts = starts.reshape([s0[0], s0[1:].prod()]).T
         ends = ends.reshape([s0[0], s0[1:].prod()]).T
         print(starts.shape, ends.shape)
-    assert s0[0] > s0[1]
     n = starts.shape[0]
     return [se2slices(starts[i], ends[i]) for i in range(n)]
 
-## return lists of slices or slice tuples
+## starts and ends api
 
-def slices_heterostride(imgshape, sliceshape, nslices=None):
-    if nslices is None:
-        nslices = np.ceil(np.array(imgshape) / np.array(sliceshape))
+def patchtool(stuff_we_know):
+    """
+    takes a dictionary of constraints on the patch structure.
+    Returns as much as we can given those constraints.
+    """
+    result = dict()
+    s = stuff_we_know
+    keyset = set(s.keys())
 
-    n = len(imgshape)
-
-    def f(i):
-        l = np.linspace(0,imgshape[i]-sliceshape[i],nslices[i])
+    def linspace(w, n):
+        l = np.linspace(0,w,n)
         l += 0.5
         l = np.floor(l).astype(np.int)
-        l = [slice(li, li+sliceshape[i]) for li in l]
         return l
 
-    slices = [f(i) for i in range(n)]
-    print([len(s) for s in slices])
-    slices = list(itertools.product(*slices))
-    return slices
+    def heterostride(domain, npts):
+        starts = [linspace(domain[i], npts[i]) for i in range(len(domain))]
+        starts = np.array(list(itertools.product(*starts)))
+        return starts
+
+    for k,v in s.items():
+        s[k] = np.array(v)
+
+    # locals().update(stuff_we_know)
+
+    if   keyset == {'sh_grid', 'stride'}:
+        n = len(s['sh_grid'])
+        starts = np.indices(s['sh_grid']).T.reshape([-1,n])
+        starts = starts * s['stride']
+        result['starts'] = starts
+    elif keyset == {'sh_img', 'sh_patch', 'overlap_factor'}:
+        s['sh_grid'] = np.ceil(s['sh_img']/s['sh_patch']*s['overlap_factor'])
+        starts = heterostride(s['sh_img'] - s['sh_patch'], s['sh_grid'])
+        ends = starts + s['sh_patch']
+        result['starts'] = starts
+        result['ends'] = ends
+        result['slices'] = starts_ends_to_slices(starts, ends)
+    elif keyset == {'sh_img', 'sh_patch', 'sh_grid'}:
+        starts = heterostride(s['sh_img'] - s['sh_patch'], s['sh_grid'])
+        ends = starts + s['sh_patch']
+        result['starts'] = starts
+        result['ends'] = ends
+        result['slices'] = starts_ends_to_slices(starts, ends)
+    elif keyset == {'sh_img', 'sh_patch', 'sh_borders'}:
+        sh_patch_valid = s['sh_patch'] - 2*s['sh_borders']
+        grid = np.ceil(s['sh_img']/sh_patch_valid).astype(np.int)
+        starts_valid = heterostride(s['sh_img'] - sh_patch_valid, grid)
+        ends_valid = starts_valid + sh_patch_valid
+        starts_padded = starts_valid
+        ends_padded = starts_padded + s['sh_patch']
+        result['starts_padded'] = starts_padded
+        result['ends_padded'] = ends_padded
+        result['slices_valid']  = starts_ends_to_slices(starts_valid, ends_valid)
+        result['slices_padded'] = starts_ends_to_slices(starts_padded, ends_padded)
+        result['slice_patch']   = se2slices(starts_valid[0]+s['sh_borders'], ends_valid[0]+s['sh_borders'])
+    else:
+        print("ERROR: Your keys are not a valid patch request.")
+
+    return result
+
+## testing
+
+def test_patchtool():
+  test = np.zeros((100,100))
+  container = np.zeros(test.shape)
+  borders = (4,5)
+  res = patchtool({'sh_img':test.shape, 'sh_patch':(32,32), 'sh_borders':borders})
+
+  padding = np.array([borders, borders]).T
+  test = np.pad(test, padding, mode='constant')
+  print(test.shape)
+  s2 = res['slice_patch']
+
+  for i in range(len(res['slices_valid'])):
+    s1 = res['slices_padded'][i]
+    s3 = res['slices_valid'][i]
+    x  = test[s1]
+    # x = x / x.mean((1,2,3))
+    print(x.shape)
+    print(s1, s2, s3)
+    container[s3] += 1
+
+  return container
 
 def coverage(imgshape, slices):
     coverage = np.zeros(imgshape)
     for ss in slices:
         coverage[ss] += 1
     return coverage, {'mean':coverage.mean(), 'uniq':np.unique(coverage)}
-
-def slices_grid(imgshape, sliceshape, stride=None, allow_hetero=False):
-    """
-    accept imghsape of arbitrary dimension.
-    if allow_hetero==True then slices are perfect covering of image, even if that means heterogeneous shapes.
-    """
-    if stride is None:
-        stride = sliceshape
-
-    if not hasattr(sliceshape,'__len__'):
-        sliceshape = [sliceshape] * len(imgshape)
-
-    n = len(imgshape)
-
-    def f(i):
-        l = list(range(0,imgshape[i]+1-sliceshape[i],stride[i]))
-        extra = sliceshape[i] + stride[i]*(len(l)-1) - imgshape[i]
-        l2 = [slice(lj, lj+sliceshape[i]) for lj in l]
-        return l2
-
-    sl1 = [f(i) for i in range(n)]
-    extra = [sliceshape[i] + stride[i]*(len(sl1[i])-1) - imgshape[i] for i in range(n)]
-    slices = list(itertools.product(*sl1))
-    return slices, extra
-
-def tiled_triplets(shape_unpadded, sliceshape, border):
-    "return list of slice triplets: input, output and container. for tiling operations."
-    border = np.array(border)
-    shape_unpadded = np.array(shape_unpadded)
-    sliceshape = np.array(sliceshape)
-
-    assert len(border)==len(shape_unpadded)
-    slices = slices_grid(shape_unpadded, sliceshape)
-    def f(ss_container):
-      ss_input = translate(ss_container, border)
-      ss_input = grow(ss_input, border)
-      sh = np.array(shape_from_slice(ss_container))
-      ss_output = translate(slice_from_shape(sh), border)
-      return (ss_input, ss_output, ss_container)
-    triplets = [f(ss) for ss in slices]
-    return triplets
-
-def make_triplets(slices, border):
-    "given a list of container slices, return triplet with matching input/output slices."
-    def f(ss_container):
-      ss_input = translate(ss_container, border)
-      ss_input = grow(ss_input, border)
-      sh = np.array(shape_from_slice(ss_container))
-      ss_output = translate(slice_from_shape(sh), border)
-      return (ss_input, ss_output, ss_container)
-    triplets = [f(ss) for ss in slices]
-    return triplets
-
-
-@DeprecationWarning
-def slices_grid_old(imgshape, sliceshape, overlap=(0,0,0), offset=(0,0,0)):
-    "slices do no not go beyond boundaries. boundary conditions must be handled separately."
-
-    if not hasattr(sliceshape,'__len__'):
-        sliceshape = [sliceshape] * len(imgshape)
-    if not hasattr(overlap,'__len__'):
-        overlap = [overlap] * len(imgshape)
-    if not hasattr(offset,'__len__'):
-        offset = [offset] * len(imgshape)
-
-    def f(i,n):
-        return slice(i,i+sliceshape[n])
-
-    def g(i):
-        return (offset[i], imgshape[i]-sliceshape[i]+1, sliceshape[i]-overlap[i])
-
-    alist = np.arange(*g(0))
-    blist = np.arange(*g(1))
-    slices = list(itertools.product(*[f(i) for i in range(len(imgshape))]))
-
-    if len(imgshape)==2:
-        it = itertools.product(alist, blist)
-        slices = [[f(i,0), f(j,1)] for i,j in it]
-    elif len(imgshape)==3:
-        clist = np.arange(*g(2))
-        it = itertools.product(alist, blist, clist)
-        slices = [[f(i,0), f(j,1), f(k,2)] for i,j,k in it]
-    
-    return np.array(slices)
 
 ## operations on slices
 
@@ -487,6 +439,13 @@ use case:
     - 2D case where I want stride < patchshape and i want to collapse z dim into channels.
         - Here i also want a small amount of overlap between patches.
     - 3D case where I want some overlap between neighboring patches dues to boundary effects.
+
+Mon Jul 16 13:08:02 2018
+
+Under what conditions is the set of starting / ending indices well defined?
+- stride and gridshape defines set of starts
+- imgshape and stride 
+- imgshape and gridshape... gridshape * stride = imgshape
 
 
 """
