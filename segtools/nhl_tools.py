@@ -112,38 +112,37 @@ def nhl2dataframe(nhl, **kwargs):
   res = pd.DataFrame([flatten_nuc(x, **kwargs) for x in nhl])
   return res
 
-
 def filter_nhls(nhls):
-    def fil(n):
-        if 3 < np.log2(n['area']):
-            return True
-        return False
-    nhls2 = []
-    for i,nhl in enumerate(nhls):
-        nhl = [n for n in nhl if fil(n)]
-        nhls2.append(nhl)
-    return nhls2
+  def fil(n):
+      if 3 < np.log2(n['area']):
+          return True
+      return False
+  nhls2 = []
+  for i,nhl in enumerate(nhls):
+      nhl = [n for n in nhl if fil(n)]
+      nhls2.append(nhl)
+  return nhls2
 
 def nhl2matrix(nhl):
-    if False:
-        flat = [[n['area'],
-                n['bbox'][0],
-                n['bbox'][1],
-                n['bbox'][2],
-                n['bbox'][3],
-                n['centroid'][0],
-                n['centroid'][1]] for n in nhl]
-    flat = [[n['centroid'][0],
-             n['centroid'][1]] for n in nhl]
-    labels = [n['label'] for n in nhl]
-    return np.array(flat), np.array(labels)
+  if False:
+      flat = [[n['area'],
+              n['bbox'][0],
+              n['bbox'][1],
+              n['bbox'][2],
+              n['bbox'][3],
+              n['centroid'][0],
+              n['centroid'][1]] for n in nhl]
+  flat = [[n['centroid'][0],
+           n['centroid'][1]] for n in nhl]
+  labels = [n['label'] for n in nhl]
+  return np.array(flat), np.array(labels)
 
 def nhls2nucdict(nhls, f=lambda x: x):
-    d = dict()
-    for i, nhl in enumerate(nhls):
-        for n in nhl:
-            d[(i, n['label'])] = f(n)
-    return d
+  d = dict()
+  for i, nhl in enumerate(nhls):
+      for n in nhl:
+          d[(i, n['label'])] = f(n)
+  return d
 
 ## operate on single nuclei
 

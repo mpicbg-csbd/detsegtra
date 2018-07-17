@@ -15,6 +15,22 @@ def factors(n):
   return set(reduce(list.__add__,
     ([i, n//i] for i in range(1, int(pow(n, 0.5) + 1)) if n % i == 0)))
 
+def pfactors(n): 
+  """
+  Finds the prime factors of 'n'
+  https://stackoverflow.com/questions/14550794/python-integer-factorization-into-primes
+  """ 
+  from math import sqrt 
+  pFact, limit, check, num = [], int(sqrt(n)) + 1, 2, n 
+  if n == 1: return [1] 
+  for check in range(2, limit): 
+       while num % check == 0: 
+          pFact.append(check) 
+          num /= check 
+  if num > 1:
+    pFact.append(num)
+  return pFact
+
 def rowscols(n,cols=8):
   "divide n things up into rows*columns things"
   rows,xt = divmod(n,cols)

@@ -25,7 +25,7 @@ import numpy as np
 from tifffile import imread, imsave
 from scipy.ndimage import zoom, label, distance_transform_edt, rotate
 from scipy.ndimage.filters import convolve
-from scipy.signal import gaussian
+from scipy.signal import gaussian, fftconvolve
 from scipy.ndimage.morphology import binary_dilation
 from skimage.morphology import watershed
 import skimage.io as io
