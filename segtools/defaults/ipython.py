@@ -33,10 +33,14 @@ import skimage.io as io
 ## my own stuff
 from .. import color
 from .. import nhl_tools
-from .. import track_tools as tt
-from .. import scores_dense as sd
-from .. import patchmaker as patch
+from .. import track_tools
+from .. import scores_dense
+from .. import patchmaker
 from .. import plotting
+from .. import math_utils
+from .. import augmentation
+from .. import stack_segmentation
+
 from ..numpy_utils import *
 from ..python_utils import *
 
