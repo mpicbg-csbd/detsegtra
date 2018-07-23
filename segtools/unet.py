@@ -24,54 +24,52 @@ from keras.utils import np_utils
 from keras.preprocessing.image import ImageDataGenerator
 
 
-def weighted_categorical_crossentropy(classweights=(1., 1.), itd=1, BEnd=K):
+def weighted_categorical_crossentropy(classweights=None, ss=None, BEnd=K):
     """
     last channel of y_pred gives pixelwise weights
     """
-    classweights = np.array(classweights)
     mean = BEnd.mean
     log  = BEnd.log
     summ = BEnd.sum
     eps  = K.epsilon()
-    if itd==0:
-        ss = [slice(None), slice(None), slice(None), slice(None)]
-    else:
-        ss = [slice(None), slice(itd,-itd), slice(itd,-itd), slice(None)]
-    def catcross(y_true, y_pred):
-        yt = y_true[ss]
-        yp = y_pred[ss]
+    def catcross(yt, yp):
+        if ss is not None:
+            yt = yt[ss]
+            yp = yp[ss]
         ws = yt[..., -1]
         yt = yt[...,:-1]
         ce = ws[...,np.newaxis] * yt * log(yp + eps)
-        ce = summ(ce, axis=(0,1,2)) / summ(ws) #* np.sum(ws) / np.size(ws)
-        result = classweights * ce
-        result = -summ(result)
-        return result
+        axes = tuple(range(len(yt.shape)))
+        ce = summ(ce, axis=axes[:-1]) / summ(ws) #* np.sum(ws) / np.size(ws)
+        if classweights is not None:
+            ce = -summ(ce*classweights)
+        else:
+            ce = -mean(ce)
+        return ce
     return catcross
 
-def my_categorical_crossentropy(classweights=(1., 1.), itd=1, BEnd=K):
+def my_categorical_crossentropy(classweights=None, ss=None, BEnd=K):
     """
     NOTE: The default classweights assumes 2 classes, but the loss works for arbitrary classes if we simply change the length of the classweights arg.
     
     Also, we can replace K with numpy to get a function we can actually evaluate (not just pass to compile)!
     """
-    classweights = np.array(classweights)
     mean = BEnd.mean
     log  = BEnd.log
     summ = BEnd.sum
     eps  = K.epsilon()
-    if itd==0:
-        ss = [slice(None), slice(None), slice(None), slice(None)]
-    else:
-        ss = [slice(None), slice(itd,-itd), slice(itd,-itd), slice(None)]
-    def catcross(y_true, y_pred):
-        yt = y_true[ss]
-        yp = y_pred[ss]
+    def catcross(yt, yp):
+        if ss is not None:
+            yt = yt[ss]
+            yp = yp[ss]
         ce = yt * log(yp + eps)
-        ce = mean(ce, axis=(0,1,2))
-        result = classweights * ce
-        result = -summ(result)
-        return result
+        axes = tuple(range(len(yt.shape)))
+        ce = mean(ce, axis=axes[:-1])
+        if classweights is not None:
+            ce = -summ(ce*classweights)
+        else:
+            ce = -mean(ce)
+        return ce
     return catcross
 
 def get_unet_n_pool(input0, n_pool=2, n_convolutions_first_layer=32,
@@ -297,8 +295,8 @@ def batch_generator_patches_aug(X, Y,
         if epoch==1 and savepath is not None:
             x = np.array(Xepoch)
             y = np.array(Yepoch)
-            print(x.shape)
-            print(y.shape)
+            print("Saving first epoch w shape: ", x.shape)
+            print("Saving first epoch w shape: ", y.shape)
             np.savez(str(savepath / 'XY_train'), x=x, y=y)
 
 def batch_generator_pred_zchannel(X,

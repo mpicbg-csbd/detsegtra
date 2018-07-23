@@ -73,6 +73,18 @@ def patchtool(stuff_we_know):
         result['slices_valid']  = starts_ends_to_slices(starts_valid, ends_valid)
         result['slices_padded'] = starts_ends_to_slices(starts_padded, ends_padded)
         result['slice_patch']   = se2slices(starts_valid[0]+s['sh_borders'], ends_valid[0]+s['sh_borders'])
+    elif keyset == {'sh_img', 'sh_patch', 'sh_borders', 'overlap_factor'}:
+        sh_patch_valid = s['sh_patch'] - 2*s['sh_borders']
+        grid = np.ceil(s['sh_img']/sh_patch_valid*s['overlap_factor']).astype(np.int)
+        starts_valid = heterostride(s['sh_img'] - sh_patch_valid, grid)
+        ends_valid = starts_valid + sh_patch_valid
+        starts_padded = starts_valid
+        ends_padded = starts_padded + s['sh_patch']
+        result['starts_padded'] = starts_padded
+        result['ends_padded'] = ends_padded
+        result['slices_valid']  = starts_ends_to_slices(starts_valid, ends_valid)
+        result['slices_padded'] = starts_ends_to_slices(starts_padded, ends_padded)
+        result['slice_patch']   = se2slices(starts_valid[0]+s['sh_borders'], ends_valid[0]+s['sh_borders'])
     else:
         print("ERROR: Your keys are not a valid patch request.")
 
