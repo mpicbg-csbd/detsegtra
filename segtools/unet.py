@@ -1,3 +1,4 @@
+
 doc="""
 UNET architecture for pixelwise classification
 """
@@ -14,7 +15,7 @@ from . import nhl_tools
 from keras.activations import softmax
 from keras.models import Model
 from keras.layers import Convolution2D
-from keras.layers import Input, MaxPooling2D, MaxPooling3D, UpSampling2D, UpSampling3D, Reshape, core, Dropout
+from keras.layers import Input, MaxPooling2D, MaxPooling3D, UpSampling2D, UpSampling3D, Reshape, core, Dropout, AveragePooling2D, AveragePooling3D
 from keras.layers.convolutional import Conv2D, Conv3D
 from keras.layers.merge import Concatenate
 from keras.optimizers import Adam, SGD
@@ -24,53 +25,15 @@ from keras.utils import np_utils
 from keras.preprocessing.image import ImageDataGenerator
 
 
-def weighted_categorical_crossentropy(classweights=None, ss=None, BEnd=K):
-    """
-    last channel of y_pred gives pixelwise weights
-    """
-    mean = BEnd.mean
-    log  = BEnd.log
-    summ = BEnd.sum
-    eps  = K.epsilon()
-    def catcross(yt, yp):
-        if ss is not None:
-            yt = yt[ss]
-            yp = yp[ss]
-        ws = yt[..., -1]
-        yt = yt[...,:-1]
-        ce = ws[...,np.newaxis] * yt * log(yp + eps)
-        axes = tuple(range(len(yt.shape)))
-        ce = summ(ce, axis=axes[:-1]) / summ(ws) #* np.sum(ws) / np.size(ws)
-        if classweights is not None:
-            ce = -summ(ce*classweights)
-        else:
-            ce = -mean(ce)
-        return ce
-    return catcross
+eps = K.epsilon()
 
-def my_categorical_crossentropy(classweights=None, ss=None, BEnd=K):
-    """
-    NOTE: The default classweights assumes 2 classes, but the loss works for arbitrary classes if we simply change the length of the classweights arg.
-    
-    Also, we can replace K with numpy to get a function we can actually evaluate (not just pass to compile)!
-    """
-    mean = BEnd.mean
-    log  = BEnd.log
-    summ = BEnd.sum
-    eps  = K.epsilon()
-    def catcross(yt, yp):
-        if ss is not None:
-            yt = yt[ss]
-            yp = yp[ss]
-        ce = yt * log(yp + eps)
-        axes = tuple(range(len(yt.shape)))
-        ce = mean(ce, axis=axes[:-1])
-        if classweights is not None:
-            ce = -summ(ce*classweights)
-        else:
-            ce = -mean(ce)
-        return ce
-    return catcross
+def crossentropy_w(yt,yp):
+    ws = yt[...,-1]
+    ws = ws[...,np.newaxis]
+    yt = yt[...,:-1]
+    ce = ws * yt * K.log(yp + eps)
+    ce = -K.mean(ce)
+    return ce
 
 def get_unet_n_pool(input0, n_pool=2, n_convolutions_first_layer=32,
                     dropout_fraction=0.2, kern_width=3):
@@ -164,6 +127,102 @@ def get_unet_n_pool(input0, n_pool=2, n_convolutions_first_layer=32,
 
     return up
 
+
+def get_unet_n_pool_recep(input0, n_pool=2, n_convolutions_first_layer=32,
+                    dropout_fraction=0.2, kern_width=3):
+    """
+    The info travel distance is given by info_travel_dist(n_pool, kern_width)
+    """
+    ndim = len(input0.shape)-2
+
+    if K.image_dim_ordering() == 'th':
+      concatax = 1
+      chan = 'channels_first'
+    elif K.image_dim_ordering() == 'tf':
+      concatax = 3 + ndim - 2
+      chan = 'channels_last'
+
+    if ndim==2:
+        Convnd  = Conv2D
+        Poolnd  = AveragePooling2D
+        Upcatnd = UpSampling2D
+        convsize = (kern_width, kern_width)
+        poolsize = (2,2)
+        upsampsize = (2,2)
+    elif ndim==3:
+        Convnd  = Conv3D
+        Poolnd  = AveragePooling3D
+        Upcatnd = UpSampling3D
+        convsize = (kern_width, kern_width, kern_width)
+        poolsize = (2,2,2)
+        upsampsize = (2,2,2)
+
+    def Conv(w):
+        return Convnd(w, convsize, padding='same', data_format=chan, activation='relu', kernel_initializer='ones', bias_initializer='zeros')
+    def Pool():
+        return Poolnd(pool_size=poolsize, data_format=chan)
+    def Upsa():
+        return Upcatnd(size=upsampsize, data_format=chan)
+    
+    d = dropout_fraction
+    
+    def cdcp(s, inpt):
+        """
+        Conv, Drop, Conv, Pool
+        """
+        s=1
+        conv = Conv(s)(inpt)
+        drop = Dropout(d)(conv)
+        conv = Conv(s)(drop)
+        pool = Pool()(conv)
+        return conv, pool
+
+    def uacdc(s, inpt, skip):
+        """
+        Up, cAt, Conv, Drop, Conv
+        """
+        s=1
+        up   = Upsa()(inpt)
+        cat  = Concatenate(axis=concatax)([up, skip])
+        conv = Conv(s)(cat)
+        drop = Dropout(d)(conv)
+        conv = Conv(s)(drop)
+        return conv
+
+    # once we've defined the above terms, the entire unet just takes a few lines ;)
+
+    # holds the output of convolutions on the contracting path
+    conv_layers = []
+
+    # the first conv comes from the inputs
+    s = n_convolutions_first_layer
+    conv, pool = cdcp(s, input0)
+    conv_layers.append(conv)
+
+    # then the recursively describeable contracting part
+    for _ in range(n_pool-1):
+        s *= 2
+        conv, pool = cdcp(s, pool)
+        conv_layers.append(conv)
+
+    # the flat bottom. no max pooling.
+    s *= 2
+    conv_bottom = Conv(s)(pool)
+    conv_bottom = Dropout(d)(conv_bottom)
+    conv_bottom = Conv(s)(conv_bottom)
+    
+    # now each time we cut s in half and build the next UACDC
+    s = s//2
+    up = uacdc(s, conv_bottom, conv_layers[-1])
+
+    # recursively describeable expanding path
+    for conv in reversed(conv_layers[:-1]):
+        s = s//2
+        up = uacdc(s, up, conv)
+
+    return up
+
+
 def acti(input0, n_classes, last_activation='softmax', **kwargs):
     "final (1,1) convolutions and activation"
     ndim = len(input0.shape)-2
@@ -173,7 +232,7 @@ def acti(input0, n_classes, last_activation='softmax', **kwargs):
     elif ndim==3:
         Convnd  = Conv3D
         finalconvsize = (1,1,1)
-    acti_layer = Convnd(n_classes, finalconvsize, padding='same', activation=None)(input0)
+    acti_layer = Convnd(n_classes, finalconvsize, padding='same', activation=None, kernel_initializer='ones', bias_initializer='zeros')(input0)
     acti_layer = core.Activation(last_activation, **kwargs)(acti_layer)
     return acti_layer
 
@@ -195,6 +254,9 @@ def info_travel_dist(n_maxpool, conv=3):
         width *= 2
         width -= conv2
     return int(-width/2)
+
+
+## all deprected?
 
 def batch_generator_patches(X, Y, train_params, verbose=False):
     epoch = 0

@@ -48,6 +48,13 @@ from ..python_utils import *
 def qsave(x):
   np.save('qsave', x)
 
+def pload():
+  x = pickle.load(open('psave.pkl','rb'))
+  return x
+
+def psave(x):
+  pickle.dump(x,open('psave.pkl','wb'))
+
 def ensure_exists(dir):
   try:
     os.makedirs(dir)
@@ -64,8 +71,14 @@ def run_from_ipython():
 
 class NumpyEncoder(json.JSONEncoder):
     def default(self, obj):
-        if isinstance(obj, np.ndarray):
-            return obj.tolist()
+        if isinstance(obj, np.ndarray): 
+            return obj.tolist()                 
+        elif type(obj) in [np.float16, np.float32, np.float64, np.float128]:
+          return float(obj)                              
+        elif type(obj) in [np.int8, np.int16, np.int32, np.int64]:     
+          return int(obj)                    
+        elif type(obj) in [np.uint8, np.uint16, np.uint32, np.uint64]:
+          return int(obj)             
         return json.JSONEncoder.default(self, obj)
 
 def add_numbered_directory(path, base):
