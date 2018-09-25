@@ -69,7 +69,7 @@ def grouped_colormap(basecolors=[(1,0,0), (0,1,0)], mult=[100,100]):
 
 ## recoloring / relabeling / mapping labels to new values
 
-def recolor_from_mapping(lab, mapping):
+def recolor_from_mapping(lab, mapping, setzero=False):
   """
   mapping can be a dictionary of int->value
   value can be int,uint or float type, can be scalar or vector
@@ -82,7 +82,10 @@ def recolor_from_mapping(lab, mapping):
     n_channels = len(somevalue)
   else:
     n_channels = 1
-  maparray = np.zeros((maxlabel+1, n_channels))
+  if setzero:
+    maparray = np.zeros((maxlabel+1, n_channels))
+  else:
+    maparray = np.arange((maxlabel+1, n_channels))
   for k,v in mapping.items():
     maparray[k] = v
   lab2 = maparray[lab.flat].reshape(lab.shape + (n_channels,))

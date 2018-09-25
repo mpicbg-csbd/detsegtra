@@ -18,7 +18,6 @@ from . import math_utils
 from . import scores_dense
 from . import color
 
-
 ## convert multiple nhls across time
 
 def labs2nhls(labs, imgs, **kwargs):

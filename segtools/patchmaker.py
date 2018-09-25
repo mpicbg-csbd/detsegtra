@@ -38,53 +38,74 @@ def patchtool(stuff_we_know):
         starts = np.array(list(itertools.product(*starts)))
         return starts
 
+    n=0
     for k,v in s.items():
         s[k] = np.array(v)
+        n=len(v)
 
     # locals().update(stuff_we_know)
 
-    if   keyset == {'sh_grid', 'stride'}:
-        n = len(s['sh_grid'])
-        starts = np.indices(s['sh_grid']).T.reshape([-1,n])
-        starts = starts * s['stride']
+    if   keyset == {'grid', 'stride'}:
+        # n = len(s['grid'])
+        inds = np.indices(s['grid']).T.reshape([-1,n])
+        starts = inds * s['stride']
         result['starts'] = starts
-    elif keyset == {'sh_img', 'sh_patch', 'overlap_factor'}:
-        s['sh_grid'] = np.ceil(s['sh_img']/s['sh_patch']*s['overlap_factor'])
-        starts = heterostride(s['sh_img'] - s['sh_patch'], s['sh_grid'])
-        ends = starts + s['sh_patch']
-        result['starts'] = starts
-        result['ends'] = ends
-        result['slices'] = starts_ends_to_slices(starts, ends)
-    elif keyset == {'sh_img', 'sh_patch', 'sh_grid'}:
-        starts = heterostride(s['sh_img'] - s['sh_patch'], s['sh_grid'])
-        ends = starts + s['sh_patch']
+        result['inds'] = inds
+    elif keyset == {'img', 'patch', 'overlap_factor'}:
+        s['grid'] = np.ceil(s['img']/s['patch']*s['overlap_factor'])
+        inds = np.indices(s['grid']).T.reshape([-1,n])
+        starts = heterostride(s['img'] - s['patch'], s['grid'])
+        ends = starts + s['patch']
         result['starts'] = starts
         result['ends'] = ends
         result['slices'] = starts_ends_to_slices(starts, ends)
-    elif keyset == {'sh_img', 'sh_patch', 'sh_borders'}:
-        sh_patch_valid = s['sh_patch'] - 2*s['sh_borders']
-        grid = np.ceil(s['sh_img']/sh_patch_valid).astype(np.int)
-        starts_valid = heterostride(s['sh_img'] - sh_patch_valid, grid)
-        ends_valid = starts_valid + sh_patch_valid
+        result['inds'] = inds
+    elif keyset == {'img', 'patch', 'stride'}:
+        s['grid'] = np.ceil(s['img']/s['patch'])
+        inds = np.indices(s['grid']).T.reshape([-1,n])
+        starts = inds * s['stride']
+        # starts = heterostride(s['img'] - s['patch'], s['grid'])
+        ends = starts + s['patch']
+        result['starts'] = starts
+        result['ends'] = ends
+        result['slices'] = starts_ends_to_slices(starts, ends)
+        result['inds'] = inds
+    elif keyset == {'img', 'patch', 'grid'}:
+        starts = heterostride(s['img'] - s['patch'], s['grid'])
+        inds = np.indices(s['grid']).T.reshape([-1,n])
+        result['inds'] = inds
+        ends = starts + s['patch']
+        result['starts'] = starts
+        result['ends'] = ends
+        result['slices'] = starts_ends_to_slices(starts, ends)
+    elif keyset == {'img', 'patch', 'borders'}:
+        patch_valid = s['patch'] - 2*s['borders']
+        grid = np.ceil(s['img']/patch_valid).astype(np.int)
+        starts_valid = heterostride(s['img'] - patch_valid, grid)
+        ends_valid = starts_valid + patch_valid
         starts_padded = starts_valid
-        ends_padded = starts_padded + s['sh_patch']
+        ends_padded = starts_padded + s['patch']
+        inds = np.indices(grid).T.reshape([-1,n])
+        result['inds'] = inds
         result['starts_padded'] = starts_padded
         result['ends_padded'] = ends_padded
         result['slices_valid']  = starts_ends_to_slices(starts_valid, ends_valid)
         result['slices_padded'] = starts_ends_to_slices(starts_padded, ends_padded)
-        result['slice_patch']   = se2slices(starts_valid[0]+s['sh_borders'], ends_valid[0]+s['sh_borders'])
-    elif keyset == {'sh_img', 'sh_patch', 'sh_borders', 'overlap_factor'}:
-        sh_patch_valid = s['sh_patch'] - 2*s['sh_borders']
-        grid = np.ceil(s['sh_img']/sh_patch_valid*s['overlap_factor']).astype(np.int)
-        starts_valid = heterostride(s['sh_img'] - sh_patch_valid, grid)
-        ends_valid = starts_valid + sh_patch_valid
+        result['slice_patch']   = se2slices(starts_valid[0]+s['borders'], ends_valid[0]+s['borders'])
+    elif keyset == {'img', 'patch', 'borders', 'overlap_factor'}:
+        patch_valid = s['patch'] - 2*s['borders']
+        grid = np.ceil(s['img']/patch_valid*s['overlap_factor']).astype(np.int)
+        starts_valid = heterostride(s['img'] - patch_valid, grid)
+        ends_valid = starts_valid + patch_valid
         starts_padded = starts_valid
-        ends_padded = starts_padded + s['sh_patch']
+        ends_padded = starts_padded + s['patch']
+        inds = np.indices(grid).T.reshape([-1,n])
+        result['inds'] = inds
         result['starts_padded'] = starts_padded
         result['ends_padded'] = ends_padded
         result['slices_valid']  = starts_ends_to_slices(starts_valid, ends_valid)
         result['slices_padded'] = starts_ends_to_slices(starts_padded, ends_padded)
-        result['slice_patch']   = se2slices(starts_valid[0]+s['sh_borders'], ends_valid[0]+s['sh_borders'])
+        result['slice_patch']   = se2slices(starts_valid[0]+s['borders'], ends_valid[0]+s['borders'])
     else:
         print("ERROR: Your keys are not a valid patch request.")
 
@@ -459,5 +480,7 @@ Under what conditions is the set of starting / ending indices well defined?
 - imgshape and stride 
 - imgshape and gridshape... gridshape * stride = imgshape
 
-
 """
+
+
+

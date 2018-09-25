@@ -91,12 +91,12 @@ def seg(lab_gt, lab, partial_dataset=False):
   else:
     return total / nobjs
 
-def precision(lab_gt, lab, partial_dataset=False):
+def precision(lab_gt, lab, iou=0.5, partial_dataset=False):
   """
   precision = TP / (TP + FP + FN) i.e. "intersection over union" for a graph matching
   """
   psg = pixel_sharing_bipartite(lab_gt, lab)
-  matching = matching_iou(psg, fraction=0.5)
+  matching = matching_iou(psg, fraction=iou)
   assert matching.sum(0).max() < 2
   assert matching.sum(1).max() < 2
   n_gt  = len(set(np.unique(lab_gt)) - {0})
