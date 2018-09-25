@@ -25,16 +25,26 @@ import gputools
 ## martin's visual stuff
 import spimagine
 
-def qopene():
+def qloade():
   res = run(['rsync efal:qsave.npy .'], shell=True)
   print(res)
   return np.load('qsave.npy')
 
-def qopen():
+def qload():
   # import subprocess
   res = run(['rsync broaddus@falcon:qsave.npy .'], shell=True)
   print(res)
   return np.load('qsave.npy')
+
+def ploade():
+  res = run(['rsync efal:psave.pkl .'], shell=True)
+  print(res)
+  return pickle.load(open('psave.pkl','rb'))
+
+def pload():
+  res = run(['rsync broaddus@falcon:psave.pkl .'], shell=True)
+  print(res)
+  return pickle.load(open('psave.pkl','rb'))
 
 def sync(name, external=False):
   cmd = "rsync -rav --exclude='*.npy' --exclude='*.tif' --exclude='*.npz' --exclude='*.h5' --exclude='*.pkl' "

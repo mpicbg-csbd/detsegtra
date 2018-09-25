@@ -48,6 +48,13 @@ from ..python_utils import *
 def qsave(x):
   np.save('qsave', x)
 
+def pload():
+  x = pickle.load(open('psave.pkl','rb'))
+  return x
+
+def psave(x):
+  pickle.dump(x,open('psave.pkl','wb'))
+
 def ensure_exists(dir):
   try:
     os.makedirs(dir)
