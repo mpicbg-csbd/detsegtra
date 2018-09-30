@@ -47,7 +47,7 @@ def pload():
   return pickle.load(open('psave.pkl','rb'))
 
 def sync(name, external=False):
-  cmd = "rsync -rav --exclude='*.npy' --exclude='*.tif' --exclude='*.npz' --exclude='*.h5' --exclude='*.pkl' "
+  cmd = "rsync -rav --exclude='*.npy' --exclude='*.net' --exclude='*.tif' --exclude='*.npz' --exclude='*.h5' --exclude='*.pkl' "
   if external:
     cmd += "efal:{0}/* {0}".format(name)
   else:
