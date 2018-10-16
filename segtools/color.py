@@ -69,29 +69,32 @@ def grouped_colormap(basecolors=[(1,0,0), (0,1,0)], mult=[100,100]):
 
 ## recoloring / relabeling / mapping labels to new values
 
-def recolor_from_mapping(lab, mapping, setzero=False):
+def recolor_from_mapping(lab, mapping):
   """
   mapping can be a dictionary of int->value
   value can be int,uint or float type, can be scalar or vector
   """
-  assert lab.max() > 0
-  assert len(list(mapping.values())) > 0
+  assert set.issubset(set(mapping.keys()), set(np.unique(lab)))
   maxlabel = lab.max().astype('int')
-  somevalue = list(mapping.values())[0]
-  if hasattr(somevalue, '__len__'):
-    n_channels = len(somevalue)
-  else:
-    n_channels = 1
-  if setzero:
-    maparray = np.zeros((maxlabel+1, n_channels))
-  else:
-    maparray = np.arange((maxlabel+1, n_channels))
+  maparray = np.zeros((maxlabel+1,3))
   for k,v in mapping.items():
     maparray[k] = v
-  lab2 = maparray[lab.flat].reshape(lab.shape + (n_channels,))
-  if lab2.shape[-1]==1: lab2 = lab2[...,0]
+  lab2 = maparray[lab.flat].reshape(lab.shape + (3,))
   return lab2
 
+
+def relabel_from_mapping(lab, mapping, setzero=False):
+  assert set.issubset(set(mapping.keys()), set(np.unique(lab)))
+  maxlabel = lab.max().astype('int')
+  maparray = np.zeros(maxlabel+1) if setzero else np.arange(maxlabel+1)
+  for k,v in mapping.items():
+    maparray[k] = v
+  lab2 = maparray[lab.flat].reshape(lab.shape)
+  return lab2
+
+
+## too simple. use the one-liner instead.
+@DeprecationWarning
 def recolor_from_ndarray(lab, perm):
   "perm is an ndarray of length > lab.max()"
   assert perm.shape[0] > lab.max()

@@ -29,7 +29,9 @@ class TrackFactory(object):
     def __init__(self, 
                 knn_n            = 3,
                 knn_dub          = 50,
-                edge_scale       = 20,
+                # edge_scale       = 20,
+                edgecost         = None,
+                vertcost         = None,
                 do_velcorr       = True,
                 neib_edge_cutoff = 40,
                 velgrad_scale    = 20,
@@ -43,8 +45,10 @@ class TrackFactory(object):
         self.graph_cost_stats   = graph_cost_stats
         self.do_velcorr         = do_velcorr
         self.velgrad_scale      = velgrad_scale
-        self.edge_scale         = edge_scale
+        # self.edge_scale         = edge_scale
         self.on_edges           = on_edges
+        self.edgecost           = edgecost
+        self.vertcost           = vertcost
 
         # self.on_edges = [((1,93), (2,100)),
         #             ((3,119), (4,96)),
@@ -103,11 +107,11 @@ class TrackFactory(object):
 
         ## vertex and edge variables
         vertvars = pulp.LpVariable.dicts('verts', graph.nodes, lowBound=0, upBound=1, cat=pulp.LpBinary)
-        vertcostdict = {n:self.vertcost(nuc_dict, n) for n in graph.nodes}
+        vertcostdict = {n:self.vertcost(nuc_dict[n]) for n in graph.nodes}
         vertterm = [vertcostdict[n]*vertvars[n] for n in graph.nodes]
 
         edgevars = pulp.LpVariable.dicts('edges', graph.edges, lowBound=0, upBound=1, cat=pulp.LpBinary)
-        edgecostdict = {(n1,n2):self.edgecost(nuc_dict, n1, n2) for (n1,n2) in graph.edges}
+        edgecostdict = {(n1,n2):self.edgecost(nuc_dict[n1], nuc_dict[n2]) for (n1,n2) in graph.edges}
         edgeterm = [edgecostdict[e]*edgevars[e] for e in graph.edges]
 
         print("VERT & EDGE COSTS")
@@ -121,11 +125,12 @@ class TrackFactory(object):
         for n in graph.nodes:
             e_out = [edgevars[(n,v)] for v in graph[n]]
             if len(e_out) > 0:
-                prob += pulp.lpSum(e_out) <= 1 * vertvars[n], ''
+                prob += pulp.lpSum(e_out) <= 2 * vertvars[n], ''
+                prob += pulp.lpSum(e_out) >= 1 * vertvars[n], ''  ## include to prevent on-vars from disappearing
         for n in graph.nodes:
             e_in = [edgevars[(v,n)] for v in graph.pred[n]]
             if len(e_in) > 0:
-                prob += pulp.lpSum(e_in)  <= 1 * vertvars[n], ''
+                prob += pulp.lpSum(e_in)  == 1 * vertvars[n], ''
 
         if self.on_edges:
             for e in on_edges:
@@ -183,21 +188,6 @@ class TrackFactory(object):
         # res = -1.0*(dxu*dxv).sum(1)
         # res[:] = 0
         return res
-
-    def edgecost(self, nucdict, n1, n2):
-        v1 = nucdict[n1]
-        v2 = nucdict[n2]
-        da = abs(v1['area'] - v2['area']) / min(v1['area'], v2['area']) - 0.1
-        
-        dx = np.array(v1['centroid']) - np.array(v2['centroid'])
-        dxnorm = dx / self.edge_scale
-        distcost = (dxnorm*dxnorm).sum() - 1.0
-        # distcost = np.linalg.norm(dxnorm) - 1.0
-        # return 0.0
-        return distcost
-
-    def vertcost(self, nucdict, n):
-        return -1
 
 
 def cost_stats_lines(graph_cost_stats):
@@ -260,7 +250,6 @@ def remove_long_edges(g, nucdict, cutoff):
     g.remove_edges_from(badedges)
 
 ## utilities and data munging
-
 
 @DeprecationWarning
 def nhls2nhldicts(nhls):
@@ -355,6 +344,49 @@ def lineagelabelmap(tb,tv):
             cm[n[0]][n[1]] = i
     return cm
 
+def lineagelabelmap2(tb,tv):
+    cm = [{0:0} for _ in range(len(tv))]
+    for i, nset in enumerate(nx.weakly_connected_components(tb)):
+        for n in nset:
+            cm[n[0]][n[1]] = i
+    return cm
+
+def run_recursive_division_labeling(tb,tv):
+    cm = [{0:0} for _ in range(len(tv))]
+    current_label = 1
+    minmaxparentdict = {}
+
+    def f(current_node, current_label, parent):
+        n = current_node
+        cm[n[0]][n[1]] = current_label
+        tup = minmaxparentdict.get(current_label, (n[0],n[0],parent))
+        minmaxparentdict[current_label] = (tup[0],n[0],parent)
+        print(n, current_label)
+        children = tuple(tb[n])
+        if len(children)==0:
+            return current_label
+        if len(children)==1:
+            return f(children[0], current_label, parent)
+        elif len(children)==2:
+            cl1 = f(children[0],current_label+1, current_label)
+            cl2 = f(children[1],cl1+1, current_label)
+            return cl2
+        else:
+            print("ERROR THREE KIDS!")
+
+    for i, nset in enumerate(nx.weakly_connected_components(tb)):
+        start_node = sorted(list(nset))[0]
+        current_label = f(start_node,current_label,0) + 1
+
+    return cm,minmaxparentdict
+
+def write_file_from_minmaxparentdict(mmpd):
+    string = ""
+    for k,v in mmpd.items():
+        string += "{} {} {} {}\n".format(k,*v)
+    return string
+
+
 ## compute statistics on a Tracking
 
 def stats_tr(tr):
@@ -424,12 +456,10 @@ def color_group(lab, group):
         mask[i] = m
     return mask
 
-def recolor_every_frame(lab, cm):
-    # labr = np.zeros(lab.shape + (3,))
-
+def relabel_every_frame(labs, cm):
     labr = []
-    for i in range(lab.shape[0]):
-        labr.append(color.recolor_from_mapping(lab[i], cm[i]))
+    for i in range(len(labs)):
+        labr.append(color.relabel_from_mapping(labs[i], cm[i], setzero=True))
     labr = np.array(labr)
     if labr.shape[-1]==1: labr = labr[...,0]
     return labr

@@ -38,10 +38,12 @@ def patchtool(stuff_we_know):
         starts = np.array(list(itertools.product(*starts)))
         return starts
 
-    n=0
+    n=len(s.get('img',s.get('grid')))
     for k,v in s.items():
-        s[k] = np.array(v)
-        n=len(v)
+        if type(v) in [tuple,list,np.array]:
+            s[k] = np.array(v)
+        else:
+            s[k] = np.array((v,)*n)
 
     # locals().update(stuff_we_know)
 
@@ -87,6 +89,27 @@ def patchtool(stuff_we_know):
         ends_padded = starts_padded + s['patch']
         inds = np.indices(grid).T.reshape([-1,n])
         result['inds'] = inds
+        result['starts_padded'] = starts_padded
+        result['ends_padded'] = ends_padded
+        result['slices_valid']  = starts_ends_to_slices(starts_valid, ends_valid)
+        result['slices_padded'] = starts_ends_to_slices(starts_padded, ends_padded)
+        result['slice_patch']   = se2slices(starts_valid[0]+s['borders'], ends_valid[0]+s['borders'])
+    elif keyset == {'img', 'patch', 'borders','stride_factor'}:
+        patch_valid = s['patch'] - 2*s['borders']
+        sf = s['stride_factor']
+        assert (patch_valid/sf == patch_valid//sf).all()
+        grid = np.ceil(s['img']/patch_valid).astype(np.int)
+        border2 = grid*patch_valid - s['img']
+        inds = np.indices(grid).T.reshape([-1,n])
+        starts_valid = inds * patch_valid
+        # starts_valid = starts + s['borders']
+        # starts_valid = heterostride((s['img'] - patch_valid)/sf, grid)*sf
+        ends_valid = starts_valid + patch_valid
+        starts_padded = starts_valid
+        ends_padded = starts_padded + s['patch']
+        # inds = np.indices(grid).T.reshape([-1,n])
+        result['inds'] = inds
+        result['border2'] = border2
         result['starts_padded'] = starts_padded
         result['ends_padded'] = ends_padded
         result['slices_valid']  = starts_ends_to_slices(starts_valid, ends_valid)

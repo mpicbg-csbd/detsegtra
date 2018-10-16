@@ -105,7 +105,7 @@ def connect_points_digraph_symmetric(x, y, reverse=True, **kwargs):
   if reverse:
     g2 = g2.reverse()
   g3 = nx.compose(g1, g2)
-  return g
+  return g3
 
 def connect_points_digraph(x, y, **kwargs):
   map_x2y = x2y_labelmap(x, y, **kwargs)
@@ -115,6 +115,7 @@ def connect_points_digraph(x, y, **kwargs):
 def kdmatch(x,y,k=7,dub=100):
   kdt = pyKDTree(y)
   dists, inds = kdt.query(x, k=k, distance_upper_bound=dub)
+  inds = inds.reshape((-1,k))
   return inds
 
 def x2y_labelmap(x, y, lx='x', ly='y', labels_x=None, labels_y=None, **kwargs):
@@ -157,7 +158,7 @@ def psg_bipartite(hyp_gt, hyp_seg):
 def unique_matching(bipartite):
   match = {}
   deg = bipartite.degree()
-  for v,u in bipartite.edges_iter():
+  for v,u in bipartite.edges():
       if deg[v]==deg[u]==1:
           match[v]=u
           match[u]=v
