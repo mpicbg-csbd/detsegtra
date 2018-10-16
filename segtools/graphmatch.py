@@ -132,6 +132,16 @@ def x2y_labelmap(x, y, lx='x', ly='y', labels_x=None, labels_y=None, **kwargs):
     labels_x2y[(lx, labels_x[i])] = [(ly, v) for v in labels_y[vs] if v!=-1]
   return labels_x2y
 
+
+def symmetric_unique_nolabel_connection(pts0,pts1,**kwargs):
+  inds_x2y = kdmatch(pts0,pts1,k=1,**kwargs)
+  matched_ys = pts1[inds_x2y[inds_x2y<len(pts1)]]
+  inds_y2x = kdmatch(pts1,pts0,k=1,**kwargs)
+  matched_xs = pts0[inds_y2x[inds_y2x<len(pts0)]]
+
+
+
+
 @DeprecationWarning
 def psg_bipartite(hyp_gt, hyp_seg):
   psg = pixel_sharing_bipartite(hyp_gt, hyp_seg)

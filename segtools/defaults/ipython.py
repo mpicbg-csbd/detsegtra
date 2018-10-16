@@ -33,7 +33,7 @@ import skimage.io as io
 ## my own stuff
 from .. import color
 from .. import nhl_tools
-from .. import track_tools
+# from .. import track_tools
 from .. import scores_dense
 from .. import patchmaker
 from .. import plotting
