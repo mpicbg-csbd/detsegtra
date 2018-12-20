@@ -71,7 +71,8 @@ def max_three_sides(stack,axis=None):
 
 @jit
 def imgidx(img, idx):
-  res = np.zeros(idx.shape + (3,))
+  s = list(img.shape)[1:]
+  res = np.zeros(s)
   for i in range(idx.shape[0]):
       for j in range(idx.shape[1]):
           res[i,j] = img[idx[i,j],i,j]

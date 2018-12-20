@@ -4,6 +4,8 @@ from termcolor import colored
 from glob import glob
 import matplotlib.pyplot as plt
 
+
+
 def edit(num=None):
   if num is None:
     cmd = 'rsub --port 52699 train_and_seg.py'

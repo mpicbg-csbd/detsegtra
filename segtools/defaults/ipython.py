@@ -8,7 +8,7 @@ import random
 import re
 import itertools
 from time import time
-# from subprocess import run
+import subprocess
 from glob import glob
 
 ## python 3 only
@@ -28,6 +28,7 @@ from scipy.ndimage.filters import convolve
 from scipy.signal import gaussian, fftconvolve
 from scipy.ndimage.morphology import binary_dilation
 from skimage.morphology import watershed
+from skimage.feature import peak_local_max
 import skimage.io as io
 
 ## my own stuff
@@ -44,6 +45,15 @@ from .. import stack_segmentation
 from ..numpy_utils import *
 from ..python_utils import *
 
+
+def moviesave(arr,name='out.mp4',rate=4,rewrite=True):
+  "axes are TYX[C]"
+  Path('movie').mkdir(exist_ok=True)
+  for i,x in enumerate(arr):
+    if os.path.exists('movie/res{:03d}.png'.format(i)) and rewrite is False: pass
+    io.imsave('movie/res{:03d}.png'.format(i),x)
+  cmd = 'ffmpeg -y -r {rate} -i "movie/res%03d.png" -vf "fps=25,format=yuv420p,pad=ceil(iw/2)*2:ceil(ih/2)*2" {name}'.format(rate=rate,name=name)
+  subprocess.run([cmd], shell=True)
 
 def qsave(x):
   np.save('qsave', x)
@@ -62,7 +72,7 @@ def ensure_exists(dir):
     print(e)
 
 def run_from_ipython():
-  "https://stackoverflow.com/questions/5376837/how-can-i-do-an-if-run-from-ipython-test-in-python"  
+  "https://stackoverflow.com/questions/5376837/how-can-i-do-an-if-run-from-ipython-test-in-python"
   try:
       __IPYTHON__
       return True
@@ -70,16 +80,16 @@ def run_from_ipython():
       return False
 
 class NumpyEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, np.ndarray):
-            return obj.tolist()
-        elif type(obj) in [np.float16, np.float32, np.float64, np.float128]:
-          return float(obj)
-        elif type(obj) in [np.int8, np.int16, np.int32, np.int64]:
-          return int(obj)
-        elif type(obj) in [np.uint8, np.uint16, np.uint32, np.uint64]:
-          return int(obj)
-        return json.JSONEncoder.default(self, obj)
+  def default(self, obj):
+    if isinstance(obj, np.ndarray):
+      return obj.tolist()
+    elif type(obj) in [np.float16, np.float32, np.float64, np.float128]:
+      return float(obj)
+    elif type(obj) in [np.int8, np.int16, np.int32, np.int64]:
+      return int(obj)
+    elif type(obj) in [np.uint8, np.uint16, np.uint32, np.uint64]:
+      return int(obj)
+    return json.JSONEncoder.default(self, obj)
 
 def add_numbered_directory(path, base):
   s = re.compile(base + r"(\d{3})")

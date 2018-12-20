@@ -84,12 +84,12 @@ def seg(lab_gt, lab, partial_dataset=False):
   matching = matching_overlap(psg, fractions=(0.5, 0))
   matching[0,:] = False
   matching[:,0] = False
-  nobjs = len(set(np.unique(lab_gt)) - {0})
-  total = iou[matching].sum()
+  n_gt = len(set(np.unique(lab_gt)) - {0})
+  n_matched = iou[matching].sum()
   if partial_dataset:
-    return total , nobjs
+    return n_matched , n_gt
   else:
-    return total / nobjs
+    return n_matched / n_gt
 
 def precision(lab_gt, lab, iou=0.5, partial_dataset=False):
   """

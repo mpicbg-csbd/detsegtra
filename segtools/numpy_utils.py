@@ -55,6 +55,17 @@ def perm(arr,p1,p2):
     perm[i] = p1.index(p)
   return arr.transpose(perm)
 
+def perm2(arr,p1,p2):
+  "permutation mapping p1 to p2 for use in numpy.transpose. elems must be unique."
+  missing  = ''.join([p for p in p2 if p not in p1])
+  newshape = arr.shape + tuple(1 for _ in missing)
+  p1 = p1 + missing
+  arr = arr.reshape(newshape)
+  perm = list(range(len(p1)))
+  for i,p in enumerate(p2):
+    perm[i] = p1.index(p)
+  return arr.transpose(perm)
+
 def collapse(arr, axes=[[0,2],[1,3]]):
   sh = arr.shape
   perm = flatten(axes)

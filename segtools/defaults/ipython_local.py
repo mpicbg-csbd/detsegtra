@@ -25,37 +25,6 @@ import gputools
 ## martin's visual stuff
 import spimagine
 
-def qloade():
-  res = run(['rsync efal:qsave.npy .'], shell=True)
-  print(res)
-  return np.load('qsave.npy')
-
-def qload():
-  # import subprocess
-  res = run(['rsync broaddus@falcon:qsave.npy .'], shell=True)
-  print(res)
-  return np.load('qsave.npy')
-
-def ploade():
-  res = run(['rsync efal:psave.pkl .'], shell=True)
-  print(res)
-  return pickle.load(open('psave.pkl','rb'))
-
-def pload():
-  res = run(['rsync broaddus@falcon:psave.pkl .'], shell=True)
-  print(res)
-  return pickle.load(open('psave.pkl','rb'))
-
-def sync(name, external=False):
-  cmd = "rsync -rav --exclude='*.npy' --exclude='*.net' --exclude='*.tif' --exclude='*.npz' --exclude='*.h5' --exclude='*.pkl' "
-  if external:
-    cmd += "efal:{0}/* {0}".format(name)
-  else:
-    cmd += "falcon:/projects/project-broaddus/fisheye/{0}/* {0}".format(name)
-
-  res = run([cmd], shell=True)
-  print(res)
-
 def update_stack(iss, img, hyp, r, nhl):
   img2 = img.copy()
   mask = nhl_tools.mask_nhl(nhl, hyp)
@@ -98,7 +67,4 @@ def open_in_preview(*args, normed=True, rm_old=True):
     io.imsave(dir0 / 'img{:03d}.png'.format(i + number + 1), arr)
   cmd = "open -a preview imshow"
   res = run([cmd], shell=True)  
-
-
-
 

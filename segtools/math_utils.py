@@ -121,15 +121,15 @@ def kernel_log_3d_2(sig=2,w=10):
     kern = kern/kern.sum()
     return kern
 
-def build_kernel_nd(w, n, func):
+def build_kernel_nd(func, w=[10,10,10]):
     """
     centered, equal-sided kernel with side-length w
     uses any func : R^n -> R
     does not normalize
     """
-    dom = np.indices((w,)*n)
+    dom = np.indices(w)
     dom = dom - (w-1)/2
-    res = [func(x) for x in dom.reshape(n,-1).T]
+    res = [func(x) for x in dom.reshape(len(w),-1).T]
     res = np.array(res).reshape(dom.shape[1:])
     return res
 

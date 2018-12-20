@@ -84,7 +84,6 @@ class SelectFromCollection(object):
         self.canvas.draw_idle()
 
 
-
 ## think about how to add this to stackviewer
 @DeprecationWarning
 class ImEditStack(object):

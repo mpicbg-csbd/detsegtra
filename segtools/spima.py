@@ -7,6 +7,7 @@ from . import patchmaker
 from . import nhl_tools
 from . import cell_view_lib as view
 
+import skimage.io as io
 
 def get_slices_from_transform(shape, tcube):
     """
@@ -23,7 +24,6 @@ def get_slices_from_transform(shape, tcube):
     zmax = int((1 + tcube.bounds[5])*zhw)
     ss = [slice(zmin, zmax), slice(ymin, ymax), slice(xmin, xmax)]
     return ss
-
 
 def onclick_sync_stack_with_spimagine(img3d, w, axis, img2dshape, r = 100):
     """
@@ -60,6 +60,9 @@ def onclick_sync_stack_with_spimagine(img3d, w, axis, img2dshape, r = 100):
         w.glWidget.dataPosChanged(0)
 
     return onclick
+
+
+
 
 def comboview(img3d, axis=0, hyp=None, tform=None):
     # setup 2d figure
@@ -105,11 +108,12 @@ def mk_quat(m):
 
 def render_rgb_still(hypRGB, w=None, transform=None, fname="sceneRGB.png"):
     if w is None:
-        w = spimagine.volshow(hypRGB[...,0], interpolation='nearest', cmap='grays', raise_window=False)
+        w = spimagine.volshow(hypRGB[...,0], interpolation='nearest', cmap='grays', raise_window=False, autoscale=False)
     
     if transform:
         w.transform.fromTransformData(transform)
     
+    print(hypRGB.shape)
     update_spim(w,0,hypRGB[...,0])
     w.saveFrame('img0.png')
     update_spim(w,0,hypRGB[...,1])
