@@ -14,7 +14,7 @@ from . import nhl_tools
 
 from keras.activations import softmax
 from keras.models import Model
-from keras.layers import Convolution2D
+from keras.layers import Convolution2D, BatchNormalization, Activation
 from keras.layers import Input, MaxPooling2D, MaxPooling3D, UpSampling2D, UpSampling3D, Reshape, core, Dropout, AveragePooling2D, AveragePooling3D
 from keras.layers.convolutional import Conv2D, Conv3D
 from keras.layers.merge import Concatenate
@@ -35,8 +35,11 @@ def crossentropy_w(yt,yp):
     ce = -K.mean(ce)
     return ce
 
-def get_unet_n_pool(input0, n_pool=2, n_convolutions_first_layer=32,
-                    dropout_fraction=0.2, kern_width=3):
+def get_unet_n_pool(input0, 
+                    n_pool=2, 
+                    n_convolutions_first_layer=32,
+                    dropout_fraction=0.2, 
+                    kern_width=3):
     """
     The info travel distance is given by info_travel_dist(n_pool, kern_width)
     """
@@ -124,6 +127,97 @@ def get_unet_n_pool(input0, n_pool=2, n_convolutions_first_layer=32,
     for conv in reversed(conv_layers[:-1]):
         s = s//2
         up = uacdc(s, up, conv)
+
+    return up
+
+def get_unet_n_poolv2(input0,
+                    n_pool=2,
+                    n_convolutions_first_layer=32,
+                    dropout_fraction=0.2,
+                    convs_per_layer=2,
+                    convsize=(3,3,3),
+                    poolsize=(2,2,2),
+                    upsampsize=(2,2,2),
+                    activation='relu',
+                    batch_norm=True,
+                    n_conv_per_scale=2,
+                    ):
+    """
+    The info travel distance is given by info_travel_dist(n_pool, kern_width)
+    """
+    ndim = len(convsize)
+
+    if K.image_dim_ordering() == 'th':
+      concatax = 1
+      chan = 'channels_first'
+    elif K.image_dim_ordering() == 'tf':
+      concatax = 3 + ndim - 2
+      chan = 'channels_last'
+
+    if ndim==2:
+        Convnd  = Conv2D
+        Poolnd  = MaxPooling2D
+        Upcatnd = UpSampling2D
+    elif ndim==3:
+        Convnd  = Conv3D
+        Poolnd  = MaxPooling3D
+        Upcatnd = UpSampling3D
+
+    def Conv(n_features):
+        def f(layer):
+            l = Convnd(n_features, convsize, padding='same', data_format=chan, kernel_initializer='he_normal')(layer)
+            if batch_norm: l = BatchNormalization()(l)
+            if activation: l = Activation(activation)(l)
+            l = Dropout(dropout_fraction)(l)
+            return l
+        return f
+    def Pool():
+        return Poolnd(pool_size=poolsize, data_format=chan)
+    def Upsa():
+        return Upcatnd(size=upsampsize, data_format=chan)
+    
+    def convs_and_pool(s, inpt):
+        """
+        Conv,Conv,...,etc,Pool
+        """
+        conv = inpt
+        for _ in range(n_conv_per_scale):
+            conv = Conv(s)(conv)
+        pool = Pool()(conv)
+        return conv, pool
+
+    def upsample_and_convs(s, inpt, skip):
+        """
+        Up, cAt, Conv, Conv, ..., etc
+        """
+        up   = Upsa()(inpt)
+        cat  = Concatenate(axis=concatax)([up, skip])
+        for _ in range(n_conv_per_scale):
+            cat = Conv(s)(cat)
+        return cat
+
+    # holds the output of convolutions on the contracting path
+    # the first conv comes from the inputs
+    skip_layers = []
+    n_features = n_convolutions_first_layer
+    pool = input0
+
+    # then the recursively describeable contracting part
+    for _ in range(n_pool):
+        conv, pool = convs_and_pool(n_features, pool)
+        skip_layers.append(conv)
+        n_features *= 2
+
+    # the flat bottom. no max pooling.
+    for _ in range(n_conv_per_scale-1):
+        pool = Conv(n_features)(pool)
+    
+    # now each time we cut n_features in half
+    up = pool
+    # recursively describeable expanding path
+    for layer in reversed(skip_layers):
+        up = upsample_and_convs(n_features, up, layer)
+        n_features = n_features//2
 
     return up
 
@@ -221,7 +315,6 @@ def get_unet_n_pool_recep(input0, n_pool=2, n_convolutions_first_layer=32,
         up = uacdc(s, up, conv)
 
     return up
-
 
 def acti(input0, n_classes, last_activation='softmax', **kwargs):
     "final (1,1) convolutions and activation"

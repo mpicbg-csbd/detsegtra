@@ -54,7 +54,7 @@ def patchtool(stuff_we_know):
         result['starts'] = starts
         result['inds'] = inds
     elif keyset == {'img', 'patch', 'overlap_factor'}:
-        s['grid'] = np.ceil(s['img']/s['patch']*s['overlap_factor'])
+        s['grid'] = np.ceil(s['img']/s['patch']*s['overlap_factor']).astype(np.int)
         inds = np.indices(s['grid']).T.reshape([-1,n])
         starts = heterostride(s['img'] - s['patch'], s['grid'])
         ends = starts + s['patch']
@@ -63,7 +63,7 @@ def patchtool(stuff_we_know):
         result['slices'] = starts_ends_to_slices(starts, ends)
         result['inds'] = inds
     elif keyset == {'img', 'patch', 'stride'}:
-        s['grid'] = np.ceil(s['img']/s['patch'])
+        s['grid'] = np.ceil(s['img']/s['patch']).astype(np.int)
         inds = np.indices(s['grid']).T.reshape([-1,n])
         starts = inds * s['stride']
         # starts = heterostride(s['img'] - s['patch'], s['grid'])

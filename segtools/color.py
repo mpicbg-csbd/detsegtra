@@ -12,45 +12,27 @@ from . import label_tools
 
 ## colormaps
 
-def pastel_colors_RGB(n_colors=10, brightness=0.5, value=0.5):
+def pastel_colors_RGB(n_colors=10, max_saturation=1.0, brightness=0.5, value=0.5, bg_id=None, shuffle=True):
   """
   a cyclic map of equal brightness and value. Good for elements of an unordered set.
   """
-  HSV_tuples = [(x * 1.0 / n_colors, brightness, value) for x in range(n_colors)]
-  RGB_tuples = [colorsys.hsv_to_rgb(*x) for x in HSV_tuples]
-  return RGB_tuples
-
-def pastel_colors_RGB_gap(n_colors=10, brightness=0.5, value=0.5):
-  """
-  leaves a gap in Hue, so colors don't cycle around, but go from Red to Blue
-  """
-  HSV_tuples = [(x * 0.75 / n_colors, brightness, value) for x in range(n_colors)]
-  RGB_tuples = [colorsys.hsv_to_rgb(*x) for x in HSV_tuples]
-  return RGB_tuples
-
-def label_colors(bg_ID=1, membrane_ID=0, n_colors = 10, maxlabel=1000):
-  RGB_tuples = pastel_colors_RGB(n_colors=10)
-  # intens *= 2**16/intens.max()
-  assert membrane_ID != bg_ID
-  RGB_tuples *= maxlabel
-  RGB_tuples[membrane_ID] = (0, 0, 0)
-  RGB_tuples[bg_ID] = (0.01, 0.01, 0.01)
-  return RGB_tuples
+  HSV_tuples = [(x * max_saturation / n_colors, brightness, value) for x in range(n_colors)]
+  cmap = np.array([colorsys.hsv_to_rgb(*x) for x in HSV_tuples])
+  if shuffle: np.random.shuffle(cmap)
+  if bg_id: cmap[bg_id] = (0,0,0)
+  return cmap
 
 def rand_cmap_uwe(n=256):
-  # cols = np.random.rand(n,3)
-  # cols = np.random.uniform(0.1,1.0,(n,3))
   h,l,s = np.random.uniform(0,1,n), 0.4 + np.random.uniform(0,0.6,n), 0.2 + np.random.uniform(0,0.8,n)
   cols = np.stack([colorsys.hls_to_rgb(_h,_l,_s) for _h,_l,_s in zip(h,l,s)],axis=0)
   cols[0] = 0
-  return cols #matplotlib.colors.ListedColormap(cols)
+  return cols
 
 def mpl_color(img, cmap='viridis', mn=None, mx=None):
   if mn is None : mn = img.min()
   if mx is None : mx = img.max()
   cmap = plt.get_cmap(cmap)
   cmap = np.array(cmap.colors)
-  # rgb_img = img.copy()
   img = img.copy()
   img = (img-mn)/(mx-mn)
   img = img.clip(min=0,max=1)
@@ -60,11 +42,11 @@ def mpl_color(img, cmap='viridis', mn=None, mx=None):
 
 def grouped_colormap(basecolors=[(1,0,0), (0,1,0)], mult=[100,100]):
   flatten = lambda l: [item for sublist in l for item in sublist]
-  colors = flatten([[c] * m for c,m in zip(basecolors, mult)])
-  colors = np.array(colors)
-  rands = np.random.rand(sum(mult),3)
-  colors = colors + rands*0.5
-  colors = np.clip(colors, 0, 1)
+  colors  = flatten([[c] * m for c,m in zip(basecolors, mult)])
+  colors  = np.array(colors)
+  rands   = np.random.rand(sum(mult),3)
+  colors  = colors + rands*0.5
+  colors  = np.clip(colors, 0, 1)
   return colors
 
 ## recoloring / relabeling / mapping labels to new values
@@ -82,7 +64,6 @@ def recolor_from_mapping(lab, mapping):
   lab2 = maparray[lab.flat].reshape(lab.shape + (3,))
   return lab2
 
-
 def relabel_from_mapping(lab, mapping, setzero=False):
   assert set.issubset(set(mapping.keys()), set(np.unique(lab)))
   maxlabel = lab.max().astype('int')
@@ -91,7 +72,6 @@ def relabel_from_mapping(lab, mapping, setzero=False):
     maparray[k] = v
   lab2 = maparray[lab.flat].reshape(lab.shape)
   return lab2
-
 
 ## too simple. use the one-liner instead.
 @DeprecationWarning
@@ -108,8 +88,7 @@ def recolor_from_ndarray(lab, perm):
 
 def graphcolor(lab):
   """
-  recolor lab s.t. touching labels have (very) different colors.
-  you can also assign random color to every object, but graph coloring enforces strong differences.
+  recolor lab s.t. touching labels have different colors, even if total number of colors is small.
   """
   matrix = label_tools.pixelgraph_edge_distribution(lab)
   mask = matrix > 0
