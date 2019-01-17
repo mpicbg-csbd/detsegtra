@@ -8,6 +8,7 @@ from tabulate import tabulate
 from math import floor, ceil
 from pathlib import Path
 from glob import glob
+import re
 
 
 flatten = lambda l: [item for sublist in l for item in sublist]
