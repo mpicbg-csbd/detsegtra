@@ -1,5 +1,6 @@
 import numpy as np
-from .python_utils import flatten
+
+flatten = lambda l: [item for sublist in l for item in sublist]
 
 def broadcast_nonscalar_op(op, arr, subaxes, axes_full=None):
   "op idx->array must preserve shape of arr[idx]. less general than broadcast_nonscalar_func, but probs faster."

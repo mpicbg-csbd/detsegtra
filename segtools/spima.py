@@ -61,9 +61,6 @@ def onclick_sync_stack_with_spimagine(img3d, w, axis, img2dshape, r = 100):
 
     return onclick
 
-
-
-
 def comboview(img3d, axis=0, hyp=None, tform=None):
     # setup 2d figure
     midspot = img3d.shape[axis]//2
@@ -101,8 +98,6 @@ def mk_quat(m):
     z = (m[1, 0] - m[0, 1]) / w4
     # TODO: Turn this into a quaternion OUTSIDE the drawing namespace!
     return (w, x, y, z)
-
-
 
 ## rendering
 

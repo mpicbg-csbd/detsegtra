@@ -1,7 +1,6 @@
 import numpy as np
 from numba import jit
 from scipy.ndimage import label
-from . import label_tools
 
 @jit
 def pixel_sharing_bipartite(lab1, lab2):
@@ -137,11 +136,19 @@ def matching_masks(lab_gt, lab):
   """
   s1,s2,s1c,s2c = matching_sets(lab_gt, lab)
   # from . import nhl_tools as label_tools
-  mask1  = label_tools.mask_labels(s1, lab_gt)
-  mask2  = label_tools.mask_labels(s2, lab)
-  mask1c = label_tools.mask_labels(s1c, lab_gt)
-  mask2c = label_tools.mask_labels(s2c, lab)
+  mask1  = mask_labels(s1, lab_gt)
+  mask2  = mask_labels(s2, lab)
+  mask1c = mask_labels(s1c, lab_gt)
+  mask2c = mask_labels(s2c, lab)
   return mask1, mask2, mask1c, mask2c
+
+def mask_labels(labels, lab):
+  mask = lab.copy()
+  recolor = np.zeros(lab.max()+1, dtype=np.bool)
+  for l in labels:
+    recolor[l] = True
+  mask = recolor[lab.flat].reshape(lab.shape)
+  return mask
 
 def sets_maps_masks_from_matching(lab_gt, lab, matching):
   """
@@ -152,10 +159,10 @@ def sets_maps_masks_from_matching(lab_gt, lab, matching):
   s2 = set(map2.keys())
   s1c = (set(np.unique(lab_gt)) - {0}) - s1
   s2c = (set(np.unique(lab))    - {0}) - s2
-  mask1  = label_tools.mask_labels(s1, lab_gt)
-  mask2  = label_tools.mask_labels(s2, lab)
-  mask1c = label_tools.mask_labels(s1c, lab_gt)
-  mask2c = label_tools.mask_labels(s2c, lab)
+  mask1  = mask_labels(s1, lab_gt)
+  mask2  = mask_labels(s2, lab)
+  mask1c = mask_labels(s1c, lab_gt)
+  mask2c = mask_labels(s2c, lab)
   res = {}
   res['maps'] = (map1, map2)
   res['sets'] = (s1,s2,s1c,s2c)
