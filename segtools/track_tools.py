@@ -27,11 +27,13 @@ class TrackFactory(object):
     """
 
     def __init__(self, 
-                knn_n            = 3,
+                knn_n            = 15,
                 knn_dub          = 50,
-                # edge_scale       = 20,
                 edgecost         = None,
                 vertcost         = None,
+                allow_div        = False,
+                allow_exit       = False,
+                allow_appear     = False,
                 do_velcorr       = True,
                 neib_edge_cutoff = 40,
                 velgrad_scale    = 20,
@@ -45,28 +47,88 @@ class TrackFactory(object):
         self.graph_cost_stats   = graph_cost_stats
         self.do_velcorr         = do_velcorr
         self.velgrad_scale      = velgrad_scale
-        # self.edge_scale         = edge_scale
         self.on_edges           = on_edges
         self.edgecost           = edgecost
         self.vertcost           = vertcost
+        self.allow_div          = allow_div
+        self.allow_exit         = allow_exit
+        self.allow_appear       = allow_appear
 
         # self.on_edges = [((1,93), (2,100)),
         #             ((3,119), (4,96)),
         #             ((3,134), (4,107))]
 
     def nhls2graph(self, nhls):
-        mats, labels = zip(*[nhl_tools.nhl2matrix(nhl) for nhl in nhls])
-        bips = [gm.connect_points_digraph(mats[i],
-                                            mats[i+1],
-                                            lx=i,
-                                            ly=i+1,
-                                            labels_x=labels[i],
-                                            labels_y=labels[i+1],
-                                            k=self.knn_n,
-                                            dub=self.knn_dub) for i in range(len(mats)-1)]
+        def mat(t): return np.array([[n['centroid'][0], n['centroid'][1], n['centroid'][2]] for n in nhls[t]])
+        def labels(t): return [n['label'] for n in nhls[t]]
+        bips = [gm.connect_points_digraph(mat(i),
+                                          mat(i+1),
+                                          lx=i,
+                                          ly=i+1,
+                                          labels_x=labels(i),
+                                          labels_y=labels(i+1),
+                                          k=self.knn_n,
+                                          dub=self.knn_dub) for i in range(len(nhls)-1)]
         graph = reduce(nx.compose, bips[1:], bips[0])
         return graph
 
+    def graph2pulp(self, graph, nhls):
+        prob = pulp.LpProblem("Assignment Problem", pulp.LpMinimize)
+
+        nuc_dict = nhl_tools.nhls2nucdict(nhls)
+
+        ## vertex and edge variables
+        vertvars = pulp.LpVariable.dicts('verts', graph.nodes, lowBound=0, upBound=1, cat=pulp.LpBinary)
+        vertcostdict = {n:self.vertcost(nuc_dict[n]) for n in graph.nodes}
+        vertterm = [vertcostdict[n]*vertvars[n] for n in graph.nodes]
+
+        edgevars = pulp.LpVariable.dicts('edges', graph.edges, lowBound=0, upBound=1, cat=pulp.LpBinary)
+        edgecostdict = {(n1,n2):self.edgecost(nuc_dict[n1], nuc_dict[n2]) for (n1,n2) in graph.edges}
+        edgeterm = [edgecostdict[e]*edgevars[e] for e in graph.edges]
+
+        print("VERT & EDGE COSTS")
+        x = np.array(list(vertcostdict.values()))
+        self.graph_cost_stats.append((x.mean(), x.min(), x.max(), x.std()))
+        x = np.array(list(edgecostdict.values()))
+        self.graph_cost_stats.append((x.mean(), x.min(), x.max(), x.std()))
+
+
+        OUTMAX = 2 if self.allow_div else 1
+        print("OUTMAX = {}".format(OUTMAX))
+        OUTMIN = 0 if self.allow_exit else 1
+        print("OUTMIN = {}".format(OUTMIN))
+
+        ## vertex and edge constraints
+        for n in graph.nodes:
+            e_out = [edgevars[(n,v)] for v in graph[n]]
+            if len(e_out) > 0:
+                prob += pulp.lpSum(e_out) <= OUTMAX * vertvars[n], ''
+                prob += pulp.lpSum(e_out) >= OUTMIN * vertvars[n], ''  ## include to prevent on-vars from disappearing
+        for n in graph.nodes:
+            e_in = [edgevars[(v,n)] for v in graph.pred[n]]
+            if len(e_in) > 0:
+                if self.allow_appear:
+                    prob += pulp.lpSum(e_in)  <= vertvars[n], ''
+                else:
+                    prob += pulp.lpSum(e_in)  == vertvars[n], ''
+
+        if self.on_edges:
+            for e in on_edges:
+                prob += edgevars[e] == 1, ''
+
+        ## objective
+        if self.do_velcorr:
+            vcterm = self.add_velocity_correlation(prob, graph, nhls, edgevars)
+            prob += pulp.lpSum(edgeterm) + pulp.lpSum(vertterm) + pulp.lpSum(vcterm), "Objective"
+        else:
+            prob += pulp.lpSum(edgeterm) + pulp.lpSum(vertterm), "Objective"
+
+        prob.writeLP('tracker.lp')
+        prob.solve(pulp.GUROBI_CMD(options=[('TimeLimit', 200), ('OptimalityTol', 1e-7)]))
+        # prob.solve(pulp.GUROBI_CMD(options=[('TimeLimit', 100), ('ResultFile','coins.sol'), ('OptimalityTol', 1e-2)]))
+        # prob.solve(pulp.PULP_CBC_CMD(options=['-sec 300']))
+        return prob, vertvars, edgevars
+  
     def nhls2tracking(self, nhls):
         graph = self.nhls2graph(nhls)
         nucdict = nhl_tools.nhls2nucdict(nhls)
@@ -99,55 +161,6 @@ class TrackFactory(object):
             return g
         neighbor_graphs = [f(points(i), labels(i)) for i in range(len(nhls))]
         return neighbor_graphs
-
-    def graph2pulp(self, graph, nhls):
-        prob = pulp.LpProblem("Assignment Problem", pulp.LpMinimize)
-
-        nuc_dict = nhl_tools.nhls2nucdict(nhls)
-
-        ## vertex and edge variables
-        vertvars = pulp.LpVariable.dicts('verts', graph.nodes, lowBound=0, upBound=1, cat=pulp.LpBinary)
-        vertcostdict = {n:self.vertcost(nuc_dict[n]) for n in graph.nodes}
-        vertterm = [vertcostdict[n]*vertvars[n] for n in graph.nodes]
-
-        edgevars = pulp.LpVariable.dicts('edges', graph.edges, lowBound=0, upBound=1, cat=pulp.LpBinary)
-        edgecostdict = {(n1,n2):self.edgecost(nuc_dict[n1], nuc_dict[n2]) for (n1,n2) in graph.edges}
-        edgeterm = [edgecostdict[e]*edgevars[e] for e in graph.edges]
-
-        print("VERT & EDGE COSTS")
-        x = np.array(list(vertcostdict.values()))
-        self.graph_cost_stats.append((x.mean(), x.min(), x.max(), x.std()))
-        x = np.array(list(edgecostdict.values()))
-        self.graph_cost_stats.append((x.mean(), x.min(), x.max(), x.std()))
-
-
-        ## vertex and edge constraints
-        for n in graph.nodes:
-            e_out = [edgevars[(n,v)] for v in graph[n]]
-            if len(e_out) > 0:
-                prob += pulp.lpSum(e_out) <= 2 * vertvars[n], ''
-                prob += pulp.lpSum(e_out) >= 1 * vertvars[n], ''  ## include to prevent on-vars from disappearing
-        for n in graph.nodes:
-            e_in = [edgevars[(v,n)] for v in graph.pred[n]]
-            if len(e_in) > 0:
-                prob += pulp.lpSum(e_in)  == 1 * vertvars[n], ''
-
-        if self.on_edges:
-            for e in on_edges:
-                prob += edgevars[e] == 1, ''
-
-        ## objective
-        if self.do_velcorr:
-            vcterm = self.add_velocity_correlation(prob, graph, nhls, edgevars)
-            prob += pulp.lpSum(edgeterm) + pulp.lpSum(vertterm) + pulp.lpSum(vcterm), "Objective"
-        else:
-            prob += pulp.lpSum(edgeterm) + pulp.lpSum(vertterm), "Objective"
-
-        prob.writeLP('tracker.lp')
-        prob.solve(pulp.GUROBI_CMD(options=[('TimeLimit', 200), ('OptimalityTol', 1e-7)]))
-        # prob.solve(pulp.GUROBI_CMD(options=[('TimeLimit', 100), ('ResultFile','coins.sol'), ('OptimalityTol', 1e-2)]))
-        # prob.solve(pulp.PULP_CBC_CMD(options=['-sec 300']))
-        return prob, vertvars, edgevars
 
     def add_velocity_correlation(self, prob, graph, nhls, edgevars):
         ## velocity correlation variables
@@ -189,7 +202,6 @@ class TrackFactory(object):
         # res[:] = 0
         return res
 
-
 def cost_stats_lines(graph_cost_stats):
     lines = []
 
@@ -227,7 +239,8 @@ def compose_trackings(trackfactory, tracklist, nhls):
     tvs = [[(0, v[1]) for v in tracklist[0].tv[0]]]
     for i,tr in enumerate(tracklist):
         tvs.append([(i+1, v[1]) for v in tr.tv[1]])
-    tes = [[((i,u[1]), (i+1,v[1])) for u,v in tr.te[0]] for i,tr in enumerate(tracklist)]
+    def f(i,tr): return [((i,u[1]), (i+1,v[1])) for u,v in tr.te[0]]
+    tes = [f(i,tr) for i,tr in enumerate(tracklist)]
     tb = true_branching(tvs,tes)
     cm = lineagecolormaps(tb, tvs)
     # nhls = nhl_tools.filter_nhls(nhls)
@@ -251,7 +264,8 @@ def remove_long_edges(g, nucdict, cutoff):
 
 ## utilities and data munging
 
-@DeprecationWarning
+# @DeprecationWarning
+
 def nhls2nhldicts(nhls):
     def f(lis):
         d = dict()
@@ -259,7 +273,6 @@ def nhls2nhldicts(nhls):
             d[n['label']] = n
         return d
     return [f(nhl) for nhl in nhls]
-
 
 ## tools to build the True Branching and Tracking solution from the PuLP result
 

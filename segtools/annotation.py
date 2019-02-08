@@ -44,3 +44,4 @@ def lasso_draw(ax, mask):
     # mask = nxutils.points_inside_poly
   lasso = LassoSelector(ax, onselect)
   return lasso
+

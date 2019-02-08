@@ -122,20 +122,6 @@ def filter_nhls(nhls):
       nhls2.append(nhl)
   return nhls2
 
-def nhl2matrix(nhl):
-  if False:
-      flat = [[n['area'],
-              n['bbox'][0],
-              n['bbox'][1],
-              n['bbox'][2],
-              n['bbox'][3],
-              n['centroid'][0],
-              n['centroid'][1]] for n in nhl]
-  flat = [[n['centroid'][0],
-           n['centroid'][1]] for n in nhl]
-  labels = [n['label'] for n in nhl]
-  return np.array(flat), np.array(labels)
-
 def nhls2nucdict(nhls, f=lambda x: x):
   d = dict()
   for i, nhl in enumerate(nhls):
