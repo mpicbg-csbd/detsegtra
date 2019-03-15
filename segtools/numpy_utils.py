@@ -2,6 +2,9 @@ import numpy as np
 
 flatten = lambda l: [item for sublist in l for item in sublist]
 
+def cat(*args,axis=0): return np.concatenate(args, axis)
+def stak(*args,axis=0): return np.stack(args, axis)
+
 def broadcast_nonscalar_op(op, arr, subaxes, axes_full=None):
   "op idx->array must preserve shape of arr[idx]. less general than broadcast_nonscalar_func, but probs faster."
   
@@ -200,3 +203,68 @@ def unique_across_axes(arr, axes):
   res = np.array(res)
   res = res.reshape(axes_shape)
   return res
+
+
+import numpy as np
+from segtools.numpy_utils import perm2, splt, collapse2
+
+def normalize(img,axs=(1,2,3),pc=[2,99.9],return_mima=False, clip=True):
+  mi,ma = np.percentile(img,pc,axis=axs,keepdims=True)
+  img = (img-mi)/(ma-mi)
+  if clip:
+    img = img.clip(0,1)
+  if return_mima:
+    return img,mi,ma
+  else:
+    return img
+
+def normalize2(img,pmin=0,pmax=100,axs=None,return_mima=False,clip=True):
+  if axs is None: axs = np.r_[0:img.ndim]
+  mi,ma = np.percentile(img,[pmin, pmax],axis=axs,keepdims=True)
+  img = (img-mi)/(ma-mi)
+  if clip:
+    img = img.clip(0,1)
+  if return_mima:
+    return img,mi,ma
+  else:
+    return img
+
+def normalize3(img,pmin=0,pmax=100,axs=None,return_mima=False,clip=True):
+  if axs is None: axs = np.r_[0:img.ndim]
+  mi,ma = np.percentile(img,[pmin, pmax],axis=axs,keepdims=True)
+  img = (img-mi)/(ma-mi)
+  if clip: img = img.clip(0,1)
+  if return_mima: return img,mi,ma
+  else: return img
+
+def pad_divisible(arr, dim, mult):
+  s = arr.shape[dim]
+  r = s % mult
+  padding = np.zeros((arr.ndim,2), dtype=np.int)
+  padding[dim,1] = (mult - r)%mult
+  arr = np.pad(arr,padding,mode='constant')
+  return arr
+
+def pad_n_divisible(arr,dims,mults):
+  for d,m in zip(dims,mults):
+    arr = pad_divisible(arr,d,m)
+  return arr
+
+def pad_until(arr, dim, size):
+  s = arr.shape[dim]
+  r = size - s
+  if r <= 0: return arr
+  padding = np.zeros((arr.ndim,2), dtype=np.int)
+  padding[dim,1] = r
+  arr = np.pad(arr,padding,mode='constant')
+  return arr
+
+def plotgrid(lst, c=5):
+  "each element of lst is a numpy array with axes 'SYX3' with last 3 channels RGB"
+  res = np.stack(lst,0)
+  res = pad_divisible(res, 1, c)
+  r = res.shape[1]//c
+  res = splt(res, r, 1)
+  res = collapse2(res, 'iRCyxc','Ry,Cix,c')
+  return res
+

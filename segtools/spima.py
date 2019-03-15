@@ -110,10 +110,13 @@ def render_rgb_still(hypRGB, w=None, transform=None, fname="sceneRGB.png"):
     
     print(hypRGB.shape)
     update_spim(w,0,hypRGB[...,0])
+    print(w.transform.maxVal)
     w.saveFrame('img0.png')
     update_spim(w,0,hypRGB[...,1])
+    print(w.transform.maxVal)
     w.saveFrame('img1.png')
     update_spim(w,0,hypRGB[...,2])
+    print(w.transform.maxVal)
     w.saveFrame('img2.png')
     
     chan1 = io.imread('img0.png')[...,0]

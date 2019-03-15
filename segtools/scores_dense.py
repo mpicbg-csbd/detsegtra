@@ -36,10 +36,10 @@ def matching_overlap(psg, fractions=(0.5,0.5)):
   NOTE: doesnt break when the fraction of pixels matching is a ratio only slightly great than 0.5? (but rounds to 0.5 with float64?)
   """
   afrac, bfrac = fractions
-  tmp = np.sum(psg, axis=1, keepdims=True)
-  m0 = np.where(tmp==0,0,psg / tmp)
-  tmp = np.sum(psg, axis=0, keepdims=True)
-  m1 = np.where(tmp==0,0,psg / tmp)
+  set0_object_sizes = np.sum(psg, axis=1, keepdims=True)
+  m0  = np.where(set0_object_sizes==0,0,psg / set0_object_sizes)
+  set1_object_sizes = np.sum(psg, axis=0, keepdims=True)
+  m1 = np.where(set1_object_sizes==0,0,psg / set1_object_sizes)
   m0 = m0 > afrac
   m1 = m1 > bfrac
   matching = m0 * m1

@@ -19,7 +19,8 @@ def pastel_colors_RGB(n_colors=10, max_saturation=1.0, brightness=0.5, value=0.5
   HSV_tuples = [(x * max_saturation / n_colors, brightness, value) for x in range(n_colors)]
   cmap = np.array([colorsys.hsv_to_rgb(*x) for x in HSV_tuples])
   if shuffle: np.random.shuffle(cmap)
-  if bg_id: cmap[bg_id] = (0,0,0)
+  if bg_id is not None: 
+    cmap[bg_id] = (0,0,0)
   return cmap
 
 def rand_cmap_uwe(n=256):

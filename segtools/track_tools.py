@@ -59,7 +59,7 @@ class TrackFactory(object):
         #             ((3,134), (4,107))]
 
     def nhls2graph(self, nhls):
-        def mat(t): return np.array([[n['centroid'][0], n['centroid'][1], n['centroid'][2]] for n in nhls[t]])
+        def mat(t): return np.array([n['centroid'] for n in nhls[t]])
         def labels(t): return [n['label'] for n in nhls[t]]
         bips = [gm.connect_points_digraph(mat(i),
                                           mat(i+1),
@@ -472,7 +472,10 @@ def color_group(lab, group):
 def relabel_every_frame(labs, cm):
     labr = []
     for i in range(len(labs)):
-        labr.append(color.relabel_from_mapping(labs[i], cm[i], setzero=True))
+        cmap = np.zeros((max(max(cm[i].keys()), labs[i].max()) + 1, 3))
+        for k,v in cm[i].items():
+            cmap[k] = v
+        labr.append(cmap[labs[i].flat].reshape(labs[i].shape + (3,)))
     labr = np.array(labr)
     if labr.shape[-1]==1: labr = labr[...,0]
     return labr

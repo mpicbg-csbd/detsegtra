@@ -46,14 +46,22 @@ from ..numpy_utils import *
 from ..python_utils import *
 
 
-def moviesave(arr,name='out.mp4',rate=4,rewrite=True):
+
+def moviesave(arr,name='out.mp4',rate=4,rewrite=True,dryrun=False):
   "axes are TYX[C]"
+  if rewrite:
+    for file in glob('movie/*'):
+      if os.path.isfile(file):
+        os.remove(file)
   Path('movie').mkdir(exist_ok=True)
   for i,x in enumerate(arr):
-    if os.path.exists('movie/res{:03d}.png'.format(i)) and rewrite is False: pass
+    if os.path.exists('movie/res{:03d}.png'.format(i)) and rewrite is False: continue
+    print("writing frame {}".format(i))
     io.imsave('movie/res{:03d}.png'.format(i),x)
   cmd = 'ffmpeg -y -r {rate} -i "movie/res%03d.png" -vf "fps=25,format=yuv420p,pad=ceil(iw/2)*2:ceil(ih/2)*2" {name}'.format(rate=rate,name=name)
-  subprocess.run([cmd], shell=True)
+  print(cmd)
+  if not dryrun:
+    subprocess.run([cmd], shell=True)
 
 def qsave(x):
   np.save('qsave', x)
