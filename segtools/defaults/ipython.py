@@ -59,7 +59,7 @@ def moviesave(arr,name='out.mp4',rate=4,rewrite=True,dryrun=False):
     warnings.simplefilter("once")
     for i,x in enumerate(arr):
       if os.path.exists('movie/res{:03d}.png'.format(i)) and rewrite is False: continue
-      print("writing frame {}".format(i))
+      print("\r writing frame {}".format(i),end="")
       io.imsave('movie/res{:03d}.png'.format(i),x)
   cmd = 'ffmpeg -y -r {rate} -i "movie/res%03d.png" -vf "fps=25,format=yuv420p,pad=ceil(iw/2)*2:ceil(ih/2)*2" {name}'.format(rate=rate,name=name)
   print(cmd)
