@@ -115,6 +115,14 @@ def patchtool(stuff_we_know):
         result['slices_valid']  = starts_ends_to_slices(starts_valid, ends_valid)
         result['slices_padded'] = starts_ends_to_slices(starts_padded, ends_padded)
         result['slice_patch']   = se2slices(starts_valid[0]+s['borders'], ends_valid[0]+s['borders'])
+        padding = [(s['borders'][i],border2[i]+s['borders'][i]) for i in range(s['img'].ndim-1)]
+        slice_orig   = [slice(s['borders'][i],-border2[i]-s['borders'][i]) for i in range(s['img'].ndim-1)]
+        slice_orig   = tuple(slice_orig)
+        result['padding'] = padding
+        result['slice_orig'] = slice_orig
+        slice_borders2   = [slice(0,-border2[i]) for i in range(s['img'].ndim-1)]
+        slice_borders2   = tuple(slice_borders2)
+        result['slice_borders2'] = slice_borders2
     elif keyset == {'img', 'patch', 'borders', 'overlap_factor'}:
         patch_valid = s['patch'] - 2*s['borders']
         grid = np.ceil(s['img']/patch_valid*s['overlap_factor']).astype(np.int)

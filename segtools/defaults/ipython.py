@@ -10,6 +10,7 @@ import itertools
 from time import time
 import subprocess
 from glob import glob
+import warnings
 
 ## python 3 only
 from pathlib import Path
@@ -54,10 +55,12 @@ def moviesave(arr,name='out.mp4',rate=4,rewrite=True,dryrun=False):
       if os.path.isfile(file):
         os.remove(file)
   Path('movie').mkdir(exist_ok=True)
-  for i,x in enumerate(arr):
-    if os.path.exists('movie/res{:03d}.png'.format(i)) and rewrite is False: continue
-    print("writing frame {}".format(i))
-    io.imsave('movie/res{:03d}.png'.format(i),x)
+  with warnings.catch_warnings():
+    warnings.simplefilter("once")
+    for i,x in enumerate(arr):
+      if os.path.exists('movie/res{:03d}.png'.format(i)) and rewrite is False: continue
+      print("writing frame {}".format(i))
+      io.imsave('movie/res{:03d}.png'.format(i),x)
   cmd = 'ffmpeg -y -r {rate} -i "movie/res%03d.png" -vf "fps=25,format=yuv420p,pad=ceil(iw/2)*2:ceil(ih/2)*2" {name}'.format(rate=rate,name=name)
   print(cmd)
   if not dryrun:

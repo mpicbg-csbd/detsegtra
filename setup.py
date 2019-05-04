@@ -3,21 +3,23 @@ from setuptools import setup, find_packages
 
 # exec (open('version.py').read())
 
-setup(name='segtools',
-      version='0.0.1',
-      description='Segmentation and tracking scores, graphs and recoloring using networkx and numpy',
+setup(name='detsegtra',
+      version='0.0.1alpha',
+      url='https://github.com/mpicbg-csbd/detsegtra',
+      description='tools for detection, segmentation, tracking of nuclei in 3D fluorescence microsopy data',
       author='Coleman Broaddus',
       author_email='broaddus@mpi-cbg.de',
       license='BSD 3-Clause License',
-      packages=find_packages(),
-     install_requires=[
+      install_requires=[
          'numpy',
          'matplotlib',
-         'pandas',
          'tifffile',
+         'pandas',
          'pulp',
-         'tensorflow',
-         'keras',
+         # 'tensorflow',
+         # 'keras',
+         'torch',
+         'torchsummary',
          'scikit-image',
          'pykdtree',
          'termcolor',
@@ -26,8 +28,8 @@ setup(name='segtools',
          'scikit-learn',
          'seaborn',
          'networkx',
-         'numba'
-      ],      
-      # packages=find_packages(),
+         'numba',
+
+      ],
       # zip_safe=False)
       )
