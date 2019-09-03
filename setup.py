@@ -10,6 +10,7 @@ setup(name='detsegtra',
       author='Coleman Broaddus',
       author_email='broaddus@mpi-cbg.de',
       license='BSD 3-Clause License',
+      packages=find_packages(),
       py_modules=['segtools'],
       install_requires=[
          'numpy',
