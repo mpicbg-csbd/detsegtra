@@ -30,7 +30,7 @@ setup(name='detsegtra',
          'seaborn',
          'networkx',
          'numba',
-
+         'vispy',
       ],
       # zip_safe=False)
       )
