@@ -2,19 +2,43 @@ import numpy as np
 from numba import jit
 
 
-## the basic building block
+## utils
 
 @jit
-def imgidx(img, idx):
-  s = list(img.shape)[1:]
+def imgidx(img3d, idx2d):
+  s = list(img3d.shape)[1:]
   res = np.zeros(s)
-  for i in range(idx.shape[0]):
-      for j in range(idx.shape[1]):
-          res[i,j] = img[idx[i,j],i,j]
+  for i in range(idx2d.shape[0]):
+      for j in range(idx2d.shape[1]):
+          res[i,j] = img3d[idx2d[i,j],i,j]
   return res
 
 ## Rendering 3D stacks
 
+def joint_raw_lab_fnzh(raw,lab,ax=0):
+  raw = raw.swapaxes(0,ax)
+  lab = lab.swapaxes(0,ax)
+  idx2d = get_fnz_idx2d(lab,0)
+  m2 = idx2d==-1
+  idx2d[m2]=0
+  lab_proj = imgidx(lab,idx2d)
+  raw_proj = imgidx(raw,idx2d)
+  lab_proj[m2]=0
+  raw_proj[m2]=0
+  return raw_proj,lab_proj
+
+def get_fnz_idx2d(lab,ax=0):
+  """
+  if all values of lab along ax are 0, then idx2d is -1.
+  can be used for 'z-coloring' a 3D segmentation
+  """
+  assert lab.ndim==3
+  mask  = lab!=0
+  idx2d = np.where(mask.any(axis=ax), mask.argmax(axis=ax), -1)
+  return idx2d
+
+
+### old
 def coord_first_nonzero(arr, axis, invalid_val=-1):
   """
   https://stackoverflow.com/questions/47269390/numpy-how-to-find-first-non-zero-value-in-every-column-of-a-numpy-array?rq=1
@@ -27,15 +51,15 @@ def coord_first_nonzero(arr, axis, invalid_val=-1):
   res = imgidx(arr, ids)
   return res
 
+## 
+
 def decay(arr, rate=0.02):
-  "as rate goes to 0 decay goes to max projection. only along z-dimension. higher z-index = deeper tissue."
+  "as rate goes to 0 decay goes to max projection. only along z-dimension. higher z-index = deeper tissue. similar to spimagine w alphaPow>0"
   dec  = np.exp(np.arange(arr.shape[0])*rate)
   arr2 = arr*dec.reshape([-1,1,1])
   ids = arr2.argmax(0)
   res = imgidx(arr, ids)
   return res
-
-
 
 
 # def max_proj_z_color(arr,plt):

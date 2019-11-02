@@ -5,7 +5,7 @@ import matplotlib
 # matplotlib.use('Qt5Agg')
 import matplotlib.pyplot as plt
 plt.ion()
-plt.switch_backend('qt5agg')
+# plt.switch_backend('qt5agg')
 
 import seaborn as sns
 from subprocess import run

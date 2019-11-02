@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.misc import imresize
+# from scipy.misc import imresize
 import skimage.transform as tform
 from scipy.ndimage import label, zoom, rotate, distance_transform_edt
 import random

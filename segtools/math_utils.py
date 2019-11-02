@@ -121,31 +121,88 @@ def kernel_log_3d_2(sig=2,w=10):
     kern = kern/kern.sum()
     return kern
 
-def build_kernel_nd(func, w=[10,10,10]):
-    """
-    centered, equal-sided kernel with side-length w
-    uses any func : R^n -> R
-    does not normalize
-    """
-    dom = np.indices(w)
-    dom = dom - (w-1)/2
-    res = [func(x) for x in dom.reshape(len(w),-1).T]
-    res = np.array(res).reshape(dom.shape[1:])
-    return res
+## deprecated
+
+def centered_kernel_nd(func, w=[10,10,10]):
+  """
+  Deprecated in favor of technique like the following:
+
+  sh = (20,20,20)
+  def f(x):
+    x = x - np.array(sh)/2
+    x = x/4
+    r = np.sqrt(x[1]**2 + x[2]**2)
+    z = np.abs(x[0])
+    k = 1.0 + 1.0J
+    return airy(r)[0] * np.exp(-k*z).real
+  kern = np.array([f(x) for x in np.indices(sh).reshape((len(sh),-1)).T]).reshape(sh)
+
+  centered, equal-sided kernel with side-length w
+  uses any func : R^n -> R
+  does not normalize
+  """
+  w = np.array(w)
+  dom = np.indices(w) # domain
+  dom = dom - (w[:,None,None,None]-1)/2
+  res = [func(x) for x in dom.reshape(len(w),-1).T]
+  res = np.array(res).reshape(dom.shape[1:])
+  return res
+
+def place_gauss_at_pts(pts, w=[6,6,6]):
+  # assert w[0]%1==0
+  w  = np.array(w)
+  w6 = np.ceil(w).astype(np.int)*6 + 1 ## gaurantees odd size and thus unique, brightest center pixel
+  def f(x):
+    return np.exp(-(x*x/w/w).sum()/2)
+  kern = centered_kernel_nd(f,w6)
+  kern = kern / kern.max()
+  res = conv_at_pts(pts, kern)
+  return res,kern
+
+def se2slice(s,e): return tuple(slice(a,b) for a,b in zip(s,e))
+
+## randomly distribute gaussians in 3D volume
+
+def place_gauss_at_pts2(pts, w=[6,6,6]):
+  # assert w[0]%1==0
+  w  = np.array(w)
+  sh = np.ceil(w).astype(np.int)*6 + 1 ## gaurantees odd size and thus unique, brightest center pixel
+  def f(x):
+    x = x - sh/2
+    return np.exp(-(x*x/w/w).sum()/2)
+  kern = np.array([f(x) for x in np.indices(sh).reshape((len(sh),-1)).T]).reshape(sh)
+  kern = kern / kern.max()
+  res = conv_at_pts(pts, kern)
+  return res,kern
+
+### deps
+
+def conv_at_pts(pts,kern):
+  "pts are taken as top-left corner for adding kernels. if pts should be center of kernel, then just crop image appropriately afterwards."
+  assert pts.ndim == 2;
+  assert kern.ndim == pts.shape[1]
+  ks = np.array(kern.shape)
+  output = np.zeros(pts.max(0) + ks)
+  for p in pts:
+    ss = se2slice(p,p+ks)
+    output[ss] += kern
+  return output
+
+## coordinate transforms
 
 def cart2pol(x, y):
-    rho = np.sqrt(x**2 + y**2)
-    phi = np.arctan2(y, x)
-    return(rho, phi)
+  rho = np.sqrt(x**2 + y**2)
+  phi = np.arctan2(y, x)
+  return(rho, phi)
 
 def pol2cart(rho, phi):
-    x = rho * np.cos(phi)
-    y = rho * np.sin(phi)
-    return(x, y)
+  x = rho * np.cos(phi)
+  y = rho * np.sin(phi)
+  return(x, y)
 
 def xyz2rthetaphi(v):
-    x,y,z = v
-    r = np.sqrt(x**2 + y**2 + z**2)
-    th = np.arctan(y/x)
-    ph = np.arccos(z/r)
-    return r,th,ph
+  x,y,z = v
+  r = np.sqrt(x**2 + y**2 + z**2)
+  th = np.arctan(y/x)
+  ph = np.arccos(z/r)
+  return r,th,ph
