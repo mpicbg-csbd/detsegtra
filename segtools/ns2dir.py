@@ -38,6 +38,7 @@ def save(dir,k,v):
 
 def dir2ns(dir):
   res = dict()
+  dir = os.path.abspath(dir)
   for root,dirs,files in os.walk(dir):
     root = Path(root)
     for d in dirs:
