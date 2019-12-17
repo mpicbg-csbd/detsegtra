@@ -163,13 +163,14 @@ def se2slice(s,e): return tuple(slice(a,b) for a,b in zip(s,e))
 
 ## randomly distribute gaussians in 3D volume
 
-def place_gauss_at_pts2(pts, w=[6,6,6]):
+def place_gauss_at_pts2(pts, sigma=[6,6,6], kern=[37,37,37]):
   # assert w[0]%1==0
-  w  = np.array(w)
-  sh = np.ceil(w).astype(np.int)*6 + 1 ## gaurantees odd size and thus unique, brightest center pixel
+  s  = np.array(sigma)
+  kern = np.array(kern)
+  sh = np.where(kern%2==1,kern,kern+1)  ## gaurantees odd size and thus unique, brightest center pixel
   def f(x):
     x = x - sh/2
-    return np.exp(-(x*x/w/w).sum()/2)
+    return np.exp(-(x*x/s/s).sum()/2)
   kern = np.array([f(x) for x in np.indices(sh).reshape((len(sh),-1)).T]).reshape(sh)
   kern = kern / kern.max()
   res  = conv_at_pts(pts, kern)
