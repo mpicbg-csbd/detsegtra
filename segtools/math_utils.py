@@ -45,9 +45,9 @@ def moments_simple_2nd(img):
     return mu
 
 @jit('f4[:,:,:](f4[:,:,:],f4[:],u1)')
-def moments_central(image, cen, order):
+def moments_central(image, cen, max_order):
     # cdef Py_ssize_t p, q, r, c
-    mu = np.zeros((order + 1, order + 1, order + 1), dtype=np.double)
+    mu = np.zeros((max_order + 1, max_order + 1, max_order + 1), dtype=np.double)
     # cdef double val, dr, dc, dcp, drq
     cx1, cx2, cx3 = cen
     for x1 in range(image.shape[0]):
@@ -60,11 +60,11 @@ def moments_central(image, cen, order):
                 val = image[x1, x2, x3]
 
                 dcx1 = 1
-                for p1 in range(order + 1):
+                for p1 in range(max_order + 1):
                     dcx2 = 1
-                    for p2 in range(order + 1):
+                    for p2 in range(max_order + 1):
                         dcx3 = 1
-                        for p3 in range(order + 1):
+                        for p3 in range(max_order + 1):
                             mu[p1, p2, p3] += val * dcx1 * dcx2 * dcx3
                             dcx3 *= x3
                         dcx2 *= x2
@@ -172,7 +172,7 @@ def place_gauss_at_pts2(pts, w=[6,6,6]):
     return np.exp(-(x*x/w/w).sum()/2)
   kern = np.array([f(x) for x in np.indices(sh).reshape((len(sh),-1)).T]).reshape(sh)
   kern = kern / kern.max()
-  res = conv_at_pts(pts, kern)
+  res  = conv_at_pts(pts, kern)
   return res,kern
 
 ### deps
