@@ -159,11 +159,17 @@ def place_gauss_at_pts(pts, w=[6,6,6]):
   res = conv_at_pts(pts, kern)
   return res,kern
 
-def se2slice(s,e): return tuple(slice(a,b) for a,b in zip(s,e))
+def se2slice(s,e):
+  # def f(x): return x if x is not in [0,-0] else None
+  return tuple(slice(a,b) for a,b in zip(s,e))
 
-## randomly distribute gaussians in 3D volume
 
+
+## place gaussians within 3D volume
+
+@DeprecationWarning
 def place_gauss_at_pts2(pts, sigma=[6,6,6], kern=[37,37,37]):
+  "place gaussians at specified points. with center of Gaussian located at the speicified point. WARNING. now we use conv_at_pts directly."
   # assert w[0]%1==0
   s  = np.array(sigma)
   kern = np.array(kern)
@@ -178,16 +184,117 @@ def place_gauss_at_pts2(pts, sigma=[6,6,6], kern=[37,37,37]):
 
 ### deps
 
-def conv_at_pts(pts,kern):
-  "pts are taken as top-left corner for adding kernels. if pts should be center of kernel, then just crop image appropriately afterwards."
-  assert pts.ndim == 2;
-  assert kern.ndim == pts.shape[1]
+@DeprecationWarning
+def conv_at_pts3(pts,kern,sh):
+  """
+  Fast convolution for sparse image (described with 1's at pts) and _sparse_ kern.
+  """
+  kern = np.zeros((19,3,3)) ## must be odd
+  kern[:,1,1] = 1
+  kern[9] = 1
+  kern[9,1,1] = 2
+
+  ma = kern!=0
   ks = np.array(kern.shape)
-  output = np.zeros(pts.max(0) + ks)
+  pts_kern = np.indices(ks)
+  target = np.zeros(ks + sh - (1,1,1))
+  pts = (np.random.rand(int(np.prod(sh)*0.01),3)*sh).astype(int)
+  for p,v in zip(pts_kern[:,ma].T,kern[ma]):
+    target[tuple((pts + p).T)] = v # np.maximum(v,target[tuple((pts + p).T)])
+  a,b,c = ks // 2
+  target = target[a:-a,b:-b,c:-c]
+  target = (target>=1).astype(np.uint8)
+
+
+@DeprecationWarning
+def conv_at_pts2(pts,kern,sh,func=lambda a,b:a+b):
+  "kernel is centered on pts. kern must have odd shape. sh is shape of output array."
+  assert pts.ndim == 2;
+  assert kern.ndim == pts.shape[1] == len(sh) == 3
+
+  ks = np.array(kern.shape)
+  assert np.all(ks%2==1)
+  a,b,c = ks//2
+
+  output = np.zeros(ks + sh - (1,1,1))
   for p in pts:
+    # z,y,x = p
     ss = se2slice(p,p+ks)
-    output[ss] += kern
+    output[ss] = func(output[ss],kern)
+  output = output[a:-a,b:-b,c:-c]
   return output
+
+
+
+
+def conv_at_pts4(pts,kern,sh,func=lambda a,b:a+b):
+  "kernel is centered on pts. kern must have odd shape. sh is shape of output array."
+  assert pts.ndim == 2;
+  assert kern.ndim == pts.shape[1] == len(sh)
+
+  kerns = [kern for _ in pts]
+  return conv_at_pts_multikern(pts,kerns,sh,func)
+
+
+def test_conv_at_pts_multikern_3d():
+  pts = np.random.rand(100,3)*(30,100,500)
+  pts = pts.astype(np.int)
+  kern_shapes = np.random.rand(100,3)*(3,3,3) + (11,12,13)
+  kern_shapes = kern_shapes.astype(np.int)
+  kerns = [np.indices(k).sum(0) for i,k in enumerate(kern_shapes)]
+  res = conv_at_pts_multikern(pts,kerns,(30,100,500),lambda a,b:a+b)
+  return res
+
+def test_conv_at_pts_multikern_2d():
+  pts = np.random.rand(100,2)*(100,500)
+  pts = pts.astype(np.int)
+  kern_shapes = np.random.rand(100,2)*(3,3) + (11,12)
+  kern_shapes = kern_shapes.astype(np.int)
+  kerns = [np.indices(k).sum(0) for i,k in enumerate(kern_shapes)]
+  res = conv_at_pts_multikern(pts,kerns,(100,500),lambda a,b:a-b)
+  return res
+
+def test_conv_at_pts_multikern_1d():
+  pts = np.random.rand(100,1)*(500,)
+  pts = pts.astype(np.int)
+  kern_shapes = np.random.rand(100,1)*(3,) + (31,)
+  kern_shapes = kern_shapes.astype(np.int)
+  kerns = [10*np.exp(-((np.indices(k).T+i-4)**2).sum(-1)) for i,k in enumerate(kern_shapes)]
+  print(kerns[0], kern_shapes[0], kern_shapes.shape)
+  print(pts.shape,len(kerns),kerns[0].shape)
+  res = conv_at_pts_multikern(pts,kerns,(500,),lambda a,b:a+b)
+  return res
+
+def conv_at_pts_multikern(pts,kerns,sh,func=lambda a,b:np.maximum(a,b)):
+  
+  kern_shapes = np.array([k.shape for k in kerns])
+  local_coord_center = kern_shapes//2
+  min_extent  = (pts - local_coord_center).min(0).clip(max=[0]*len(sh))
+  max_extent  = (pts - local_coord_center + kern_shapes).max(0).clip(min=sh)
+  full_extent = max_extent - min_extent
+  pts2 = pts - min_extent
+  
+  target = np.zeros(full_extent)
+
+  for i,p in enumerate(pts2):
+    ss = se2slice(p - local_coord_center[i], p - local_coord_center[i] + kern_shapes[i])
+    target[ss] = func(target[ss], kerns[i])
+
+  print("min extent: ", min_extent)
+  print("max extent: ", max_extent)
+
+  A = np.abs(min_extent)
+  _tmp = sh-max_extent
+  B = np.where(_tmp==0,None,_tmp)
+  ss = se2slice(A,B)
+
+  # target2 = target.copy()
+  # target2[...] = -5
+  # target2[ss] = target[ss]
+
+  target2 = target[ss]
+  return target2
+
 
 ## coordinate transforms
 

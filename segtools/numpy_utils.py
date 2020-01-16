@@ -83,6 +83,12 @@ def collapse2(arr, ax0, ax1):
   axes_list = [[ax0.index(x) for x in els] for els in ax1.split(',')]
   return collapse(arr, axes_list)
 
+## TODO: better tools for working with array dimensions (split,merge,name,etc)
+# def collapse3(arr, ax0, ax1):
+#   "e.g. collapse(arr, 'tczyx','ty,zx,c')"
+#   axes_list = [[ax0.index(x) for x in els] for els in ax1.split(',')]
+#   return collapse(arr, axes_list)
+
 def merg(arr, ax=0):
   "given a list of axes, merge each one with it's successor."
   if type(ax) is list:

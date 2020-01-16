@@ -23,8 +23,8 @@ def clean(s):
   s = s2 if s2 else "d"+s
   return s
 
-known_filetypes = ['.npy', '.png', '.tif', '.pkl',] # '.json',]
-known_scalars = [int,float,str,Path,PosixPath]
+known_filetypes = ['.npy', '.png', '.tif', '.tiff', '.pkl', '.json',]
+known_scalars = [bool,int,tuple,range,float,str,bytes,Path,PosixPath]
 known_collections = [dict, set, list]
 known_array_collection = [np.ndarray, torch.Tensor]
 
@@ -113,6 +113,15 @@ def load(base,filtr='.'):
 
   return SimpleNamespace(**res)
 
+extension_to_load = {
+  '.npy':lambda f: np.load(f),
+  '.png':lambda f: np.array(io.imread(f)),
+  '.tif':lambda f: tifffile.imread(str(f)),
+  '.tiff':lambda f: tifffile.imread(str(f)),
+  '.pkl':lambda f:pickle.load(open(f,'rb')),
+  '.json':lambda f: json.load(open(f,'r')),
+  }
+
 def _load_file(f):
   f = Path(f)
   if f.suffix=='.npy':
@@ -128,5 +137,6 @@ def _load_file(f):
       x=json.load(open(f,'r'))
     except Exception as e:
       print(e)
-      return []
+      x=[]
+    return x
 

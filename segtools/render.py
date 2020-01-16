@@ -38,7 +38,8 @@ def get_fnz_idx2d(lab,ax=0):
   return idx2d
 
 
-### old
+### old use get_fnz_idx2d instead
+@DeprecationWarning
 def coord_first_nonzero(arr, axis, invalid_val=-1):
   """
   https://stackoverflow.com/questions/47269390/numpy-how-to-find-first-non-zero-value-in-every-column-of-a-numpy-array?rq=1

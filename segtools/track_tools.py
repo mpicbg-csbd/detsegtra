@@ -10,6 +10,8 @@ import matplotlib.pyplot as plt
 import scipy.spatial as sp
 from numba import jit
 
+import ipdb
+
 from . import scores_dense as ss
 from . import nhl_tools
 from . import graphmatch as gm
@@ -26,7 +28,7 @@ class TrackFactory(object):
     Minimizes the resulting the LP problem
     """
 
-    def __init__(self, 
+    def __init__(self,
                 knn_n            = 15,
                 knn_dub          = 50,
                 edgecost         = None,
@@ -58,7 +60,31 @@ class TrackFactory(object):
         #             ((3,119), (4,96)),
         #             ((3,134), (4,107))]
 
-    def nhls2graph(self, nhls):
+    def nhls2tracking(self, nhls):
+        graph = self._nhls2graph(nhls)
+        nucdict = nhl_tools.nhls2nucdict(nhls)
+
+        prob, vv, ev = self._graph2pulp(graph, nhls)
+        # ipdb.set_trace()
+
+        ## Debugging
+        print("Status: ", prob.status)
+        print("Vert Vars:", Counter([v.value() for v in vv.values()]))
+        print("Edge Vars:", Counter([v.value() for v in ev.values()]))
+        
+        tv, te, tb = vars2tb(vv, ev)
+        if tv[0]==[]:
+            raise ValueError("No cells in the solution.")
+        
+        al = arrowlist(tb, tv, nucdict)
+        cm = lineagecolormaps(tb, tv)
+
+        tr = Tracking(graph, tb, tv, te, al, cm)
+        return tr
+
+    ## --- nhls2tracking depends on below
+
+    def _nhls2graph(self, nhls):
         def mat(t): return np.array([n['centroid'] for n in nhls[t]])
         def labels(t): return [n['label'] for n in nhls[t]]
         bips = [gm.connect_points_digraph(mat(i),
@@ -72,7 +98,7 @@ class TrackFactory(object):
         graph = reduce(nx.compose, bips[1:], bips[0])
         return graph
 
-    def graph2pulp(self, graph, nhls):
+    def _graph2pulp(self, graph, nhls):
         prob = pulp.LpProblem("Assignment Problem", pulp.LpMinimize)
 
         nuc_dict = nhl_tools.nhls2nucdict(nhls)
@@ -118,7 +144,7 @@ class TrackFactory(object):
 
         ## objective
         if self.do_velcorr:
-            vcterm = self.add_velocity_correlation(prob, graph, nhls, edgevars)
+            vcterm = self._add_velocity_correlation(prob, graph, nhls, edgevars)
             prob += pulp.lpSum(edgeterm) + pulp.lpSum(vertterm) + pulp.lpSum(vcterm), "Objective"
         else:
             prob += pulp.lpSum(edgeterm) + pulp.lpSum(vertterm), "Objective"
@@ -128,43 +154,12 @@ class TrackFactory(object):
         # prob.solve(pulp.GUROBI_CMD(options=[('TimeLimit', 100), ('ResultFile','coins.sol'), ('OptimalityTol', 1e-2)]))
         # prob.solve(pulp.PULP_CBC_CMD(options=['-sec 300']))
         return prob, vertvars, edgevars
-  
-    def nhls2tracking(self, nhls):
-        graph = self.nhls2graph(nhls)
-        nucdict = nhl_tools.nhls2nucdict(nhls)
 
-        prob, vv, ev = self.graph2pulp(graph, nhls)
+    ## --- 2nd level of dependence
 
-        ## Debugging
-        print("Status: ", prob.status)
-        print("Vert Vars:", Counter([v.value() for v in vv.values()]))
-        print("Edge Vars:", Counter([v.value() for v in ev.values()]))
-        
-        tv, te, tb = vars2tb(vv, ev)
-        if tv[0]==[]:
-            raise ValueError("No cells in the solution.")
-        
-        al = arrowlist(tb, tv, nucdict)
-        cm = lineagecolormaps(tb, tv)
-
-        tr = Tracking(graph, tb, tv, te, al, cm)
-        return tr
-
-    def build_neighbor_graphs(self, nhls):
-        nucdict = nhl_tools.nhls2nucdict(nhls)
-        points = lambda i: np.array([n['centroid'] for n in nhls[i]])
-        labels = lambda i: [(i, n['label']) for n in nhls[i]]
-        def f(points, labels):
-            vor = sp.Voronoi(points)
-            g = nx.from_edgelist([(labels[x], labels[y]) for x,y in vor.ridge_dict.keys()])
-            remove_long_edges(g, nucdict, self.neib_edge_cutoff)
-            return g
-        neighbor_graphs = [f(points(i), labels(i)) for i in range(len(nhls))]
-        return neighbor_graphs
-
-    def add_velocity_correlation(self, prob, graph, nhls, edgevars):
+    def _add_velocity_correlation(self, prob, graph, nhls, edgevars):
         ## velocity correlation variables
-        neighbor_graphs = self.build_neighbor_graphs(nhls)
+        neighbor_graphs = self._build_neighbor_graphs(nhls)
         nuc_dict = nhl_tools.nhls2nucdict(nhls)
         neighbor_vars = []
         for ng in neighbor_graphs[:-1]:
@@ -175,7 +170,7 @@ class TrackFactory(object):
                         if ui!=vi:
                             neighbor_vars.append((u,ui,v,vi))
         neighbor_vars_pulp = pulp.LpVariable.dicts('velocitygrad', neighbor_vars, lowBound=0, upBound=1, cat=pulp.LpBinary)
-        costs = self.velocity_grad_cost_list(nuc_dict, neighbor_vars)
+        costs = self._velocity_grad_cost_list(nuc_dict, neighbor_vars)
         x = np.array(costs)
         self.graph_cost_stats.append((x.mean(), x.min(), x.max(), x.std()))
         neighbor_vars_term = [costs[i]*neighbor_vars_pulp[vp] for i,vp in enumerate(neighbor_vars)]
@@ -188,7 +183,21 @@ class TrackFactory(object):
 
         return neighbor_vars_term
 
-    def velocity_grad_cost_list(self, nucdict, neighbor_vars):
+    ## --- bottom level of dependence
+
+    def _build_neighbor_graphs(self, nhls):
+        nucdict = nhl_tools.nhls2nucdict(nhls)
+        points = lambda i: np.array([n['centroid'] for n in nhls[i]])
+        labels = lambda i: [(i, n['label']) for n in nhls[i]]
+        def f(points, labels):
+            vor = sp.Voronoi(points)
+            g = nx.from_edgelist([(labels[x], labels[y]) for x,y in vor.ridge_dict.keys()])
+            remove_long_edges(g, nucdict, self.neib_edge_cutoff)
+            return g
+        neighbor_graphs = [f(points(i), labels(i)) for i in range(len(nhls))]
+        return neighbor_graphs
+
+    def _velocity_grad_cost_list(self, nucdict, neighbor_vars):
         xu  = np.array([nucdict[vp[0]]['centroid'] for vp in neighbor_vars])
         xui = np.array([nucdict[vp[1]]['centroid'] for vp in neighbor_vars])
         xv  = np.array([nucdict[vp[2]]['centroid'] for vp in neighbor_vars])
@@ -245,7 +254,7 @@ def compose_trackings(trackfactory, tracklist, nhls):
     cm = lineagecolormaps(tb, tvs)
     # nhls = nhl_tools.filter_nhls(nhls)
     nucdict = nhl_tools.nhls2nucdict(nhls)
-    graph = trackfactory.nhls2graph(nhls)
+    graph = trackfactory._nhls2graph(nhls)
     al = arrowlist(tb, tvs, nucdict)
     tr = Tracking(graph, tb, tvs, tes, al, cm)
     return tr
@@ -266,6 +275,7 @@ def remove_long_edges(g, nucdict, cutoff):
 
 # @DeprecationWarning
 
+@DeprecationWarning
 def nhls2nhldicts(nhls):
     def f(lis):
         d = dict()
