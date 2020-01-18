@@ -265,7 +265,7 @@ def test_conv_at_pts_multikern_1d():
   res = conv_at_pts_multikern(pts,kerns,(500,),lambda a,b:a+b)
   return res
 
-def conv_at_pts_multikern(pts,kerns,sh,func=lambda a,b:np.maximum(a,b)):
+def conv_at_pts_multikern(pts,kerns,sh,func=lambda a,b:np.maximum(a,b),beyond_borders=False):
   
   kern_shapes = np.array([k.shape for k in kerns])
   local_coord_center = kern_shapes//2
@@ -288,11 +288,13 @@ def conv_at_pts_multikern(pts,kerns,sh,func=lambda a,b:np.maximum(a,b)):
   B = np.where(_tmp==0,None,_tmp)
   ss = se2slice(A,B)
 
-  # target2 = target.copy()
-  # target2[...] = -5
-  # target2[ss] = target[ss]
+  if beyond_borders is True:
+    target2 = target.copy()
+    target2[...] = -5
+    target2[ss] = target[ss]
+  else:
+    target2 = target[ss]
 
-  target2 = target[ss]
   return target2
 
 

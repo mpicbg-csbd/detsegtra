@@ -8,6 +8,7 @@ import numpy as np
 import os
 import re
 import torch
+import collections
 
 import ipdb
 
@@ -87,7 +88,10 @@ def load(base,filtr='.'):
 
   if base.is_file(): return _load_file(base) ## ignore filter
 
-  for d in base.iterdir():
+  from segtools.python_utils import sorted_alphanum
+  for d in sorted_alphanum(map(str, (base.iterdir()))):
+    print(d)
+    d=Path(d)
     d2 = clean(d.stem)
 
     if d2 in res.keys():
@@ -140,3 +144,28 @@ def _load_file(f):
       x=[]
     return x
 
+def toarray(sn):
+  assert type(sn) is SimpleNamespace
+  # def f(x): print(x);return x
+  return np.array([x for x in sn.__dict__.values() if type(x) is np.ndarray])
+
+def flatten(l):
+  for el in l:
+    if isinstance(el, collections.Iterable) and not isinstance(el, (str, bytes)):
+      yield from flatten(el)
+    else:
+      yield el
+
+def flatten_sn(l):
+  return SimpleNamespace(**flatten_nested_dicts(l))
+
+def flatten_nested_dicts(d, parent_key='', sep='_'):
+  items = []
+  if type(d) is SimpleNamespace: d = d.__dict__
+  for k, v in d.items():
+    new_key = parent_key + sep + k if parent_key else k
+    if isinstance(v, collections.MutableMapping) or isinstance(v,SimpleNamespace):
+      items.extend(flatten_nested_dicts(v, new_key, sep=sep).items())
+    else:
+      items.append((new_key, v))
+  return dict(items)
