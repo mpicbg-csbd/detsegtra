@@ -43,8 +43,9 @@ def save(d, base):
   
   base = Path(base).resolve()
 
-  if base.suffix in known_filetypes and _is_collection(d):
-    _save_file(base.parent, base.stem, d)
+  if base.suffix in extension_to_write.keys():
+    f = extension_to_write[base.suffix]
+    f(base, d)
     return
 
   assert type(d) is SimpleNamespace
@@ -64,23 +65,24 @@ def save(d, base):
 
   pickle.dump(scalars,open(base/"scalars.pkl",'wb'))
 
-def _save_file(dir,k,v):
+def _save_file(dir,name,v):
   dir = Path(dir); dir.mkdir(parents=True,exist_ok=True)
+  name = str(name)
 
   if type(v) is torch.Tensor: v = v.numpy()
 
   if type(v) is np.ndarray and v.dtype == np.uint8 and (v.ndim==2 or (v.ndim==3 and v.shape[2] in [3,4])):
-    io.imsave(dir/(str(k)+'.png'),v)
+    io.imsave(dir/(name +'.png'),v)
   elif type(v) is np.ndarray:
-    # file = str(dir/(str(k)+".tif"))
+    # file = str(dir/(name +".tif"))
     # tifffile.imsave(file,v,compress=0)
-    np.save(dir/(str(k)+'.npy'),v)
+    np.save(dir/(name +'.npy'),v)
   elif type(v) in known_collections:
     try:
-      json.dump(v,open(dir/(str(k)+'.json'),'w'))
+      json.dump(v,open(dir/(name +'.json'),'w'))
     except:
-      os.remove(dir/(str(k)+'.json'))
-      pickle.dump(v,open(dir/(str(k)+'.pkl'),'wb'))
+      os.remove(dir/(name +'.json'))
+      pickle.dump(v,open(dir/(name +'.pkl'),'wb'))
 
 def load(base,filtr='.'):
   res  = dict()
@@ -117,14 +119,26 @@ def load(base,filtr='.'):
 
   return SimpleNamespace(**res)
 
-extension_to_load = {
-  '.npy':lambda f: np.load(f),
-  '.png':lambda f: np.array(io.imread(f)),
-  '.tif':lambda f: tifffile.imread(str(f)),
-  '.tiff':lambda f: tifffile.imread(str(f)),
-  '.pkl':lambda f:pickle.load(open(f,'rb')),
-  '.json':lambda f: json.load(open(f,'r')),
+extension_to_read = {
+  '.npy': lambda f : np.load(f),
+  '.png': lambda f : np.array(io.imread(f)),
+  '.tif': lambda f : tifffile.imread(str(f)),
+  '.tiff':lambda f : tifffile.imread(str(f)),
+  '.pkl': lambda f : pickle.load(open(f,'rb')),
+  '.json':lambda f : json.load(open(f,'r')),
   }
+
+extension_to_write = {
+  '.npy':lambda  f,x : np.save(f,x),
+  '.png':lambda  f,x : io.imsave(f,x),
+  '.tif':lambda  f,x : tifffile.imsave(str(f),x),
+  '.tiff':lambda f,x : tifffile.imsave(str(f),x),
+  '.pkl':lambda  f,x : pickle.dump(x,open(f,'rb')),
+  '.json':lambda f,x : json.dump(x,open(f,'r')),
+  }
+
+
+
 
 def _load_file(f):
   f = Path(f)
