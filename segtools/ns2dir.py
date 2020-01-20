@@ -9,6 +9,7 @@ import os
 import re
 import torch
 import collections
+from scipy.io import loadmat
 
 import ipdb
 
@@ -24,7 +25,7 @@ def clean(s):
   s = s2 if s2 else "d"+s
   return s
 
-known_filetypes = ['.npy', '.png', '.tif', '.tiff', '.pkl', '.json',]
+known_filetypes = ['.npy', '.png', '.tif', '.tiff', '.pkl', '.json', '.mat']
 known_scalars = [bool,int,tuple,range,float,str,bytes,Path,PosixPath]
 known_collections = [dict, set, list]
 known_array_collection = [np.ndarray, torch.Tensor]
@@ -44,6 +45,7 @@ def save(d, base):
   base = Path(base).resolve()
 
   if base.suffix in extension_to_write.keys():
+    base.parent.mkdir(parents=True,exist_ok=True)
     f = extension_to_write[base.suffix]
     f(base, d)
     return
@@ -126,6 +128,7 @@ extension_to_read = {
   '.tiff':lambda f : tifffile.imread(str(f)),
   '.pkl': lambda f : pickle.load(open(f,'rb')),
   '.json':lambda f : json.load(open(f,'r')),
+  '.mat': lambda f : SimpleNamespace(**loadmat(f)),
   }
 
 extension_to_write = {
@@ -140,23 +143,26 @@ extension_to_write = {
 
 
 
-def _load_file(f):
-  f = Path(f)
-  if f.suffix=='.npy':
-    return np.load(f)
-  if f.suffix=='.png':
-    return np.array(io.imread(f))
-  if f.suffix in ['.tif','.tiff']:
-    return tifffile.imread(str(f))
-  if f.suffix=='.pkl':
-    return pickle.load(open(f,'rb'))
-  if f.suffix=='.json':
-    try:
-      x=json.load(open(f,'r'))
-    except Exception as e:
-      print(e)
-      x=[]
-    return x
+def _load_file(name):
+  name = Path(name)
+  f = extension_to_read[name.suffix]
+  return f(name)
+  # f = Path(f)
+  # if f.suffix=='.npy':
+  #   return np.load(f)
+  # if f.suffix=='.png':
+  #   return np.array(io.imread(f))
+  # if f.suffix in ['.tif','.tiff']:
+  #   return tifffile.imread(str(f))
+  # if f.suffix=='.pkl':
+  #   return pickle.load(open(f,'rb'))
+  # if f.suffix=='.json':
+  #   try:
+  #     x=json.load(open(f,'r'))
+  #   except Exception as e:
+  #     print(e)
+  #     x=[]
+  #   return x
 
 def toarray(sn):
   assert type(sn) is SimpleNamespace
