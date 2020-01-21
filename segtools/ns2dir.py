@@ -136,8 +136,8 @@ extension_to_write = {
   '.png':lambda  f,x : io.imsave(f,x),
   '.tif':lambda  f,x : tifffile.imsave(str(f),x),
   '.tiff':lambda f,x : tifffile.imsave(str(f),x),
-  '.pkl':lambda  f,x : pickle.dump(x,open(f,'rb')),
-  '.json':lambda f,x : json.dump(x,open(f,'r')),
+  '.pkl':lambda  f,x : pickle.dump(x,open(f,'wb')),
+  '.json':lambda f,x : json.dump(x,open(f,'w')),
   }
 
 
