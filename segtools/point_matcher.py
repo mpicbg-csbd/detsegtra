@@ -67,11 +67,15 @@ def match_unambiguous_nearestNeib(pts_gt,pts_yp,dub=10):
   res.yp2gt_dists, res.yp2gt = kdt.query(pts_yp, k=1, distance_upper_bound=dub)
   res.yp2gt_mask = res.yp2gt<len(pts_yp)
 
-  res.matches = np.arange(len(pts_gt)) == res.yp2gt[res.gt2yp]
+  res.gt_matches = np.arange(len(pts_gt)) == res.yp2gt[res.gt2yp]
+  res.gt2yp[~res.gt_matches] = -1
+
+  res.yp_matches = np.arange(len(pts_yp)) == res.gt2yp[res.yp2gt]
+  res.yp2gt[~res.yp_matches] = -1
 
   # res.matched, counts = np.unique(res.gt2yp[res.gt2yp_mask], return_counts=True)
   # res.totals = len(matched), len(pts_yp), len(pts_gt)
-  res.n_matched  = res.matches.sum()
+  res.n_matched  = res.gt_matches.sum()
   res.n_proposed = len(pts_yp)
   res.n_gt       = len(pts_gt)
   res.precision  = res.n_matched / res.n_proposed
