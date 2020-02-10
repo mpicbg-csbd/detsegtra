@@ -4,26 +4,18 @@ from types import SimpleNamespace
 from scipy.optimize import linear_sum_assignment
 
 def match_points_single(pts_gt,pts_yp,dub=10):
-  """
-  pts_gt is ground truth. pts_yp as predictions. this function is not symmetric!
-  """
-
-  res = SimpleNamespace()
-
+  "pts_gt is ground truth. pts_yp as predictions. this function is not symmetric!"
   pts_gt = np.array(pts_gt)
   pts_yp = np.array(pts_yp)
-  if 0 in pts_gt.shape or 0 in pts_yp.shape:
-    res.totals = 0,len(pts_yp),len(pts_gt)
-    return res.totals
+  if 0 in pts_gt.shape: return 0,len(pts_yp),len(pts_gt)
+  if 0 in pts_yp.shape: return 0,len(pts_yp),len(pts_gt)
+  # print(pts_gt.shape, pts_yp.shape)
 
   kdt = pyKDTree(pts_yp)
-  res.dists, res.gt2yp = kdt.query(pts_gt, k=1, distance_upper_bound=dub)
-  res.gt2yp_valid = res.gt2yp<len(pts_yp)
+  dists, inds = kdt.query(pts_gt, k=1, distance_upper_bound=dub)
+  matched,counts = np.unique(inds[inds<len(pts_yp)], return_counts=True)
+  return len(matched), len(pts_yp), len(pts_gt)
 
-  res.matched, counts = np.unique(res.gt2yp[res.gt2yp_valid], return_counts=True)
-  res.totals = len(matched), len(pts_yp), len(pts_gt)
-
-  return res.totals
 
 def match_points_single2(pts_gt,pts_yp,dub=10):
   """
