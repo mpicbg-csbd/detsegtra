@@ -33,7 +33,7 @@ def matches2scores(matches):
 
 
 
-def match_points_single2(pts_gt,pts_yp,dub=10):
+def match_unambiguous_nearestNeib(pts_gt,pts_yp,dub=10):
   """
   pts_gt is ground truth. pts_yp as predictions. this function is not symmetric!
   we return binary masks for pts_gt and pts_yp where masked elements are matched.
@@ -60,11 +60,17 @@ def match_points_single2(pts_gt,pts_yp,dub=10):
     return res
 
   kdt = pyKDTree(pts_yp)
-  res.dists, res.gt2yp = kdt.query(pts_gt, k=1, distance_upper_bound=dub)
+  res.gt2yp_dists, res.gt2yp = kdt.query(pts_gt, k=1, distance_upper_bound=dub)
   res.gt2yp_mask = res.gt2yp<len(pts_yp)
 
-  res.matched, counts = np.unique(res.gt2yp[res.gt2yp_mask], return_counts=True)
-  res.totals = len(matched), len(pts_yp), len(pts_gt)
+  kdt = pyKDTree(pts_gt)
+  res.yp2gt_dists, res.yp2gt = kdt.query(pts_yp, k=1, distance_upper_bound=dub)
+  res.yp2gt_mask = res.yp2gt<len(pts_yp)
+
+  res.matches = np.arange(len(res.pts_gt)) == res.yp2gt[res.gt2yp]
+
+  # res.matched, counts = np.unique(res.gt2yp[res.gt2yp_mask], return_counts=True)
+  # res.totals = len(matched), len(pts_yp), len(pts_gt)
 
   return res
 
