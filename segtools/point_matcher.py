@@ -97,6 +97,7 @@ def score_hungarian(hun,dub=2.5):
   hun.precision  = hun.n_matched / hun.n_proposed
   hun.recall     = hun.n_matched / hun.n_gt
   hun.f1         = 2*hun.n_matched / (hun.n_proposed + hun.n_gt)
+  return hun
 
 def listOfHungarians_to_Scores(hungs):
   res = SimpleNamespace()
