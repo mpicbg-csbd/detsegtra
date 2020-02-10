@@ -33,7 +33,7 @@ def matches2scores(matches):
 
 
 
-def match_unambiguous_nearestNeib(pts_gt,pts_yp,dub=10):
+def match_unambiguous_nearestNeib(pts_gt,pts_yp,dub=10,scale=[1,1,1]):
   """
   pts_gt is ground truth. pts_yp as predictions. this function is not symmetric!
   we return binary masks for pts_gt and pts_yp where masked elements are matched.
@@ -50,8 +50,8 @@ def match_unambiguous_nearestNeib(pts_gt,pts_yp,dub=10):
 
   res = SimpleNamespace()
 
-  pts_gt = np.array(pts_gt)
-  pts_yp = np.array(pts_yp)
+  pts_gt = np.array(pts_gt) * scale ## for matching in anisotropic spaces
+  pts_yp = np.array(pts_yp) * scale ## for matching in anisotropic spaces
 
   if 0 in pts_gt.shape or 0 in pts_yp.shape:
     res.totals = 0,len(pts_yp),len(pts_gt)
