@@ -71,6 +71,12 @@ def match_unambiguous_nearestNeib(pts_gt,pts_yp,dub=10):
 
   # res.matched, counts = np.unique(res.gt2yp[res.gt2yp_mask], return_counts=True)
   # res.totals = len(matched), len(pts_yp), len(pts_gt)
+  res.n_matched  = res.matches.sum()
+  res.n_proposed = len(pts_yp)
+  res.n_gt       = len(pts_gt)
+  res.precision  = res.n_matched / res.n_proposed
+  res.recall     = res.n_matched / res.n_gt
+  res.f1         = 2*res.n_matched / (res.n_proposed + res.n_gt)
 
   return res
 
