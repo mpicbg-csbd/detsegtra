@@ -71,6 +71,8 @@ def match_unambiguous_nearestNeib(pts_gt,pts_yp,dub=10,scale=[1,1,1]):
   res.n_matched  = len(res.gt_matches)
   res.n_proposed = len(pts_yp)
   res.n_gt       = len(pts_gt)
+  res.pts_gt = pts_gt
+  res.pts_yp = pts_yp
   res.precision  = res.n_matched / res.n_proposed
   res.recall     = res.n_matched / res.n_gt
   res.f1         = 2*res.n_matched / (res.n_proposed + res.n_gt)
