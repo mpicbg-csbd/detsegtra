@@ -367,13 +367,6 @@ def lineagelabelmap(tb,tv):
             cm[n[0]][n[1]] = i
     return cm
 
-def lineagelabelmap2(tb,tv):
-    cm = [{0:0} for _ in range(len(tv))]
-    for i, nset in enumerate(nx.weakly_connected_components(tb)):
-        for n in nset:
-            cm[n[0]][n[1]] = i
-    return cm
-
 def run_recursive_division_labeling(tb,tv):
     cm = [{0:0} for _ in range(len(tv))]
     current_label = 1
@@ -482,6 +475,18 @@ def color_group(lab, group):
 def relabel_every_frame(labs, cm):
     labr = []
     for i in range(len(labs)):
+        maxval = max(max(cm[i].keys()), labs[i].max()) + 1
+        cmap = np.zeros(maxval)
+        for k,v in cm[i].items():
+            cmap[k] = v
+        labr.append(cmap[labs[i].flat].reshape(labs[i].shape))
+    labr = np.array(labr)
+    # if labr.shape[-1]==1: labr = labr[...,0]
+    return labr
+
+def recolor_every_frame(labs, cm):
+    labr = []
+    for i in range(len(labs)):
         cmap = np.zeros((max(max(cm[i].keys()), labs[i].max()) + 1, 3))
         for k,v in cm[i].items():
             cmap[k] = v
@@ -489,6 +494,7 @@ def relabel_every_frame(labs, cm):
     labr = np.array(labr)
     if labr.shape[-1]==1: labr = labr[...,0]
     return labr
+
 
 ## draw arrows and flow
 

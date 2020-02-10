@@ -27,17 +27,19 @@ def clean(s):
 
 known_filetypes = ['.npy', '.png', '.tif', '.tiff', '.pkl', '.json', '.mat']
 known_scalars = [bool,int,tuple,range,float,str,bytes,Path,PosixPath]
-known_collections = [dict, set, list]
-known_array_collection = [np.ndarray, torch.Tensor]
+known_py_collections = [dict, set, list]
+# known_array_collection = [np.ndarray, torch.Tensor]
 
 def _is_scalar(x):
   if type(x) in known_scalars: return True
-  if type(x) in known_array_collection and x.ndim==0: return True
+  if type(x) is np.ndarray and x.ndim==0: return True
+  if type(x) is torch.Tensor and x.ndimension==0: return True
   return False
 
 def _is_collection(x):
-  if type(x) in known_collections: return True
-  elif type(x) in known_array_collection and x.ndim > 0: return True
+  if type(x) in known_py_collections: return True
+  if type(x) is np.ndarray and x.ndim>0: return True
+  if type(x) is torch.Tensor and x.ndimension()>0: return True
   return False
 
 def save(d, base):
@@ -79,7 +81,7 @@ def _save_file(dir,name,v):
     # file = str(dir/(name +".tif"))
     # tifffile.imsave(file,v,compress=0)
     np.save(dir/(name +'.npy'),v)
-  elif type(v) in known_collections:
+  elif type(v) in known_py_collections:
     try:
       json.dump(v,open(dir/(name +'.json'),'w'))
     except:
@@ -139,7 +141,6 @@ extension_to_write = {
   '.pkl':lambda  f,x : pickle.dump(x,open(f,'wb')),
   '.json':lambda f,x : json.dump(x,open(f,'w')),
   }
-
 
 
 
