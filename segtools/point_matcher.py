@@ -60,17 +60,19 @@ def match_unambiguous_nearestNeib(pts_gt,pts_yp,dub=10):
     return res
 
   kdt = pyKDTree(pts_yp)
-  res.gt2yp_dists, res.gt2yp = kdt.query(pts_gt, k=1, distance_upper_bound=dub)
-  res.gt2yp_mask = res.gt2yp<len(pts_yp)
+  gt2yp_dists, gt2yp = kdt.query(pts_gt, k=1, distance_upper_bound=dub)
+  gt2yp_mask = gt2yp<len(pts_yp)
 
   kdt = pyKDTree(pts_gt)
-  res.yp2gt_dists, res.yp2gt = kdt.query(pts_yp, k=1, distance_upper_bound=dub)
-  res.yp2gt_mask = res.yp2gt<len(pts_gt)
+  yp2gt_dists, yp2gt = kdt.query(pts_yp, k=1, distance_upper_bound=dub)
+  yp2gt_mask = yp2gt<len(pts_gt)
 
 
   ## matches are objects where the connections form a cycle. i.e. f:x->y, g:y->x and x_i = g(f(x_i))
-  res.gt_matches = np.arange(len(pts_gt))[res.gt2yp_mask] == res.yp2gt[res.gt2yp[res.gt2yp_mask]]
-  res.yp_matches = np.arange(len(pts_yp))[res.yp2gt_mask] == res.gt2yp[res.yp2gt[res.yp2gt_mask]]
+  res.gt_matches = np.arange(len(pts_gt))[gt2yp_mask] == yp2gt[gt2yp[gt2yp_mask]]
+  res.yp_matches = np.arange(len(pts_yp))[yp2gt_mask] == gt2yp[yp2gt[yp2gt_mask]]
+
+  assert res.gt_matches.sum() == res.yp_matches.sum()
 
   # res.matched, counts = np.unique(res.gt2yp[res.gt2yp_mask], return_counts=True)
   # res.totals = len(matched), len(pts_yp), len(pts_gt)
