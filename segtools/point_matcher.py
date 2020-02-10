@@ -67,7 +67,7 @@ def match_unambiguous_nearestNeib(pts_gt,pts_yp,dub=10):
   res.yp2gt_dists, res.yp2gt = kdt.query(pts_yp, k=1, distance_upper_bound=dub)
   res.yp2gt_mask = res.yp2gt<len(pts_yp)
 
-  res.matches = np.arange(len(res.pts_gt)) == res.yp2gt[res.gt2yp]
+  res.matches = np.arange(len(pts_gt)) == res.yp2gt[res.gt2yp]
 
   # res.matched, counts = np.unique(res.gt2yp[res.gt2yp_mask], return_counts=True)
   # res.totals = len(matched), len(pts_yp), len(pts_gt)
@@ -111,7 +111,7 @@ def score_hungarian(hun,dub=2.5):
   hun.f1         = 2*hun.n_matched / (hun.n_proposed + hun.n_gt)
   return hun
 
-def listOfHungarians_to_Scores(hungs):
+def listOfMatches_to_Scores(hungs):
   res = SimpleNamespace()
   res.n_gt = sum([h.n_gt for h in hungs])
   res.n_proposed = sum([h.n_proposed for h in hungs])
