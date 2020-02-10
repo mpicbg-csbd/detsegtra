@@ -68,7 +68,7 @@ def match_points_single2(pts_gt,pts_yp,dub=10):
 
   return res
 
-def hungarian_matching(x,y,dub=10):
+def hungarian_matching(x,y,scale=[1,1,1]):
   """
   matching that minimizes sum of costs (in this case euclidean distance).
   the 
@@ -77,7 +77,7 @@ def hungarian_matching(x,y,dub=10):
   hun.cost = np.zeros((len(x), len(y)))
   for i,c in enumerate(x):
     for j,d in enumerate(y):
-      hun.cost[i,j] = np.linalg.norm(c-d)
+      hun.cost[i,j] = np.linalg.norm((c-d)*scale)
   hun.lsa = linear_sum_assignment(hun.cost)
   return hun
 
