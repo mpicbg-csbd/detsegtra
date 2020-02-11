@@ -65,14 +65,14 @@ def match_unambiguous_nearestNeib(pts_gt,pts_yp,dub=10,scale=[1,1,1]):
   kdt = pyKDTree(pts_gt)
   yp2gt_dists, yp2gt = kdt.query(pts_yp, k=1, distance_upper_bound=dub)
 
-  # res.gt_matched_mask = np.where()
-  # ipdb.set_trace()
-  inds = np.arange(len(pts_gt))
-  res.gt_matched_mask = (gt2yp < len(pts_yp)) & (yp2gt[gt2yp[inds]]==inds)
-  inds = np.arange(len(pts_yp))
-  res.yp_matched_mask = (yp2gt < len(pts_gt)) & (gt2yp[yp2gt[inds]]==inds)
-  # res.gt_matched = np.array([i for i in np.arange(len(pts_gt)) if gt2yp[i]<len(pts_yp) and yp2gt[gt2yp[i]]==i])
-  # res.yp_matched = np.array([i for i in np.arange(len(pts_yp)) if yp2gt[i]<len(pts_gt) and gt2yp[yp2gt[i]]==i])
+
+  N = len(pts_gt)
+  inds = np.arange(N)
+  ## must extend yp2gt with N for gt points whose nearest neib is beyond dub
+  res.gt_matched_mask = np.r_[yp2gt,N][gt2yp]==inds
+  N = len(pts_yp)
+  inds = np.arange(N)
+  res.yp_matched_mask = np.r_[gt2yp,N][yp2gt]==inds
 
   assert res.gt_matched_mask.sum() == res.yp_matched_mask.sum()
   res.gt2yp = gt2yp
@@ -89,9 +89,9 @@ def match_unambiguous_nearestNeib(pts_gt,pts_yp,dub=10,scale=[1,1,1]):
   return res
 
 def test_matching():
-  x = np.random.rand(10)[...,None]
-  y = np.random.rand(14)[...,None]
-  sym = match_unambiguous_nearestNeib(x,y,dub=4,scale=1)
+  x = np.random.rand(10)[...,None]*100
+  y = np.random.rand(14)[...,None]*100
+  sym = match_unambiguous_nearestNeib(x,y,dub=1,scale=1)
   import matplotlib.pyplot as plt
   plt.plot(x, np.zeros(len(x)), 'o')
   plt.plot(y, np.ones(len(y)), 'o')
