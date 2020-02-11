@@ -64,11 +64,16 @@ def match_unambiguous_nearestNeib(pts_gt,pts_yp,dub=10,scale=[1,1,1]):
   kdt = pyKDTree(pts_gt)
   yp2gt_dists, yp2gt = kdt.query(pts_yp, k=1, distance_upper_bound=dub)
 
-  res.gt_matches = np.array([i for i in np.arange(len(pts_gt)) if gt2yp[i]<len(pts_yp) and yp2gt[gt2yp[i]]==i])
-  res.yp_matches = np.array([i for i in np.arange(len(pts_yp)) if yp2gt[i]<len(pts_gt) and gt2yp[yp2gt[i]]==i])
+  # res.gt_matched_mask = np.where()
+  inds = np.arange(len(pts_gt))
+  res.gt_matched_mask = (gt2yp < len(pts_yp)) & (yp2gt[gt2yp[inds]]==inds)
+  inds = np.arange(len(pts_yp))
+  res.yp_matched_mask = (yp2gt < len(pts_gt)) & (gt2yp[yp2gt[inds]]==inds)
+  # res.gt_matched = np.array([i for i in np.arange(len(pts_gt)) if gt2yp[i]<len(pts_yp) and yp2gt[gt2yp[i]]==i])
+  # res.yp_matched = np.array([i for i in np.arange(len(pts_yp)) if yp2gt[i]<len(pts_gt) and gt2yp[yp2gt[i]]==i])
 
-  assert len(res.gt_matches) == len(res.yp_matches)
-  res.n_matched  = len(res.gt_matches)
+  assert res.gt_matched_mask.sum() == res.yp_matched_mask.sum()
+  res.n_matched  = res.gt_matched_mask.sum()
   res.n_proposed = len(pts_yp)
   res.n_gt       = len(pts_gt)
   res.pts_gt = pts_gt
