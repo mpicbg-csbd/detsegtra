@@ -2,6 +2,7 @@ from pykdtree.kdtree import KDTree as pyKDTree
 import numpy as np
 from types import SimpleNamespace
 from scipy.optimize import linear_sum_assignment
+import ipdb
 
 def match_points_single(pts_gt,pts_yp,dub=10):
   "pts_gt is ground truth. pts_yp as predictions. this function is not symmetric!"
@@ -65,6 +66,7 @@ def match_unambiguous_nearestNeib(pts_gt,pts_yp,dub=10,scale=[1,1,1]):
   yp2gt_dists, yp2gt = kdt.query(pts_yp, k=1, distance_upper_bound=dub)
 
   # res.gt_matched_mask = np.where()
+  # ipdb.set_trace()
   inds = np.arange(len(pts_gt))
   res.gt_matched_mask = (gt2yp < len(pts_yp)) & (yp2gt[gt2yp[inds]]==inds)
   inds = np.arange(len(pts_yp))
@@ -73,6 +75,8 @@ def match_unambiguous_nearestNeib(pts_gt,pts_yp,dub=10,scale=[1,1,1]):
   # res.yp_matched = np.array([i for i in np.arange(len(pts_yp)) if yp2gt[i]<len(pts_gt) and gt2yp[yp2gt[i]]==i])
 
   assert res.gt_matched_mask.sum() == res.yp_matched_mask.sum()
+  res.gt2yp = gt2yp
+  res.yp2gt = yp2gt
   res.n_matched  = res.gt_matched_mask.sum()
   res.n_proposed = len(pts_yp)
   res.n_gt       = len(pts_gt)
@@ -83,6 +87,17 @@ def match_unambiguous_nearestNeib(pts_gt,pts_yp,dub=10,scale=[1,1,1]):
   res.f1         = 2*res.n_matched / (res.n_proposed + res.n_gt)
 
   return res
+
+def test_matching():
+  x = np.random.rand(10)[...,None]
+  y = np.random.rand(14)[...,None]
+  sym = match_unambiguous_nearestNeib(x,y,dub=4,scale=1)
+  import matplotlib.pyplot as plt
+  plt.plot(x, np.zeros(len(x)), 'o')
+  plt.plot(y, np.ones(len(y)), 'o')
+  for i in np.arange(len(x))[sym.gt_matched_mask]:
+    plt.plot([x[i],y[sym.gt2yp[i]]],[0,1],'k')
+
 
 def hungarian_matching(x,y,scale=[1,1,1]):
   """
@@ -107,6 +122,7 @@ def score_hungarian(hun,dub=2.5):
   hun.y_mask = mtx.sum(0).astype(np.bool)
   hun.x2y    = mtx.argmax(1); hun.x2y[~hun.x_mask] = -1
   hun.y2x    = mtx.argmax(0); hun.y2x[~hun.y_mask] = -1
+  
   hun.n_matched  = mtx.sum()
   hun.n_gt       = mtx.shape[0]
   hun.n_proposed = mtx.shape[1]
