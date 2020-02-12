@@ -121,6 +121,24 @@ def kernel_log_3d_2(sig=2,w=10):
     kern = kern/kern.sum()
     return kern
 
+
+## 
+
+def autocorrelation_2d(x):
+  """
+  2D autocorrelation
+  remove mean per-patch (not global GT)
+  normalize stddev to 1
+  """
+  assert x.ndim == 2
+  x = (x - np.mean(x))/np.std(x)
+  # x = np.pad(x, [(50,50),(50,50)], mode='constant')
+  f = np.fft.fft2(x)
+  p = np.abs(f)**2
+  pi = np.fft.ifft2(p)
+  pi = np.fft.fftshift(pi)
+  return pi.real
+
 ## deprecated
 
 def centered_kernel_nd(func, w=[10,10,10]):

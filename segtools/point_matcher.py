@@ -44,7 +44,7 @@ def match_unambiguous_nearestNeib(pts_gt,pts_yp,dub=10,scale=[1,1,1]):
   The old way was to only compute the function from gt to yp.
   Thus an individual yp may appear zero or more times.
   
-  BUG: we never established a true matching, just the score. 
+  BUG: we never established a true matching, just the score.
   Our scheme was such that all gt points within `dub` distance of a yp were considered matched, even if that match was not unique.
   This is probably not correct...
   """
