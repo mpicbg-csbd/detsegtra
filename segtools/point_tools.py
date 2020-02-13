@@ -30,8 +30,8 @@ def patches_from_centerpoints(img,centerpoints,patchsize=(32,32),bounds='constan
   """
   bounds in 'constant', 'shift'
   """
-  patchsize = np.array(patchsize)
-  imshape   = np.array(img.shape)
+  patchsize    = np.array(patchsize)
+  imshape      = np.array(img.shape)
   centerpoints = np.array(centerpoints)
   if centerpoints.ndim==1: centerpoints = centerpoints[None]
   assert patchsize.shape[0]==img.ndim==centerpoints.shape[1]
