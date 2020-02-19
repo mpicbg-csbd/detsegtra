@@ -22,6 +22,9 @@ def old_match_to_scores(match):
   res.n_matched = match[0]
   res.n_proposed = match[1]
   res.n_gt = match[2]
+  res.precision  = res.n_matched / res.n_proposed
+  res.recall     = res.n_matched / res.n_gt
+  res.f1         = 2*res.n_matched / (res.n_proposed + res.n_gt)
   return res
 
 def matches2scores(matches):
