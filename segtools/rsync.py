@@ -19,12 +19,14 @@ def rsync_pull(localpath="/Users/broaddus/Desktop/project-broaddus/devseg_2/e02/
   if cleardir:
     if localpath.exists(): shutil.rmtree(localpath)
 
-  excludes = "--exclude '*.pt' --exclude 'pred/'"
-  excludes += " --exclude ta/mx_vali/target.tif "
-  if justfiles: excludes += " --exclude '*/'"
+  args = ""
+  args += " --exclude '*.pt' --exclude 'pred/Fluo*' "
+  args += " --include 'pred/mx_z/' "
+  args += " --exclude 'ta/mx_vali/' "
+  if justfiles: args += " --exclude '*/'"
 
   call([f"mkdir -p {localpath}"],shell=True)
-  cmd = f"rsync -maP {excludes} efal:{remote}/{shared_extension} {local_pull}/{shared_extension} > rsync.out 2>&1"
+  cmd = f"rsync -maP {args} efal:{remote}/{shared_extension} {local_pull}/{shared_extension} > rsync.out 2>&1"
   print(cmd)
   Popen([cmd],shell=True)
 

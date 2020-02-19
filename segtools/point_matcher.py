@@ -17,6 +17,13 @@ def match_points_single(pts_gt,pts_yp,dub=10):
   matched,counts = np.unique(inds[inds<len(pts_yp)], return_counts=True)
   return len(matched), len(pts_yp), len(pts_gt)
 
+def old_match_to_scores(match):
+  res = SimpleNamespace()
+  res.n_matched = match[0]
+  res.n_proposed = match[1]
+  res.n_gt = match[2]
+  return res
+
 def matches2scores(matches):
   """
   matches is an Nx3 array with (n_matched, n_proposed, n_target) semantics.
@@ -31,8 +38,6 @@ def matches2scores(matches):
   d.recall_2    = (  matches[:,0] / np.maximum(matches[:,2],1)).mean()
 
   return d
-
-
 
 def match_unambiguous_nearestNeib(_pts_gt,_pts_yp,dub=10,scale=[1,1,1]):
   """
@@ -64,7 +69,6 @@ def match_unambiguous_nearestNeib(_pts_gt,_pts_yp,dub=10,scale=[1,1,1]):
   gt2yp_dists, gt2yp = kdt.query(pts_gt, k=1, distance_upper_bound=dub)
   kdt = pyKDTree(pts_gt)
   yp2gt_dists, yp2gt = kdt.query(pts_yp, k=1, distance_upper_bound=dub)
-
 
   N = len(pts_gt)
   inds = np.arange(N)
@@ -131,11 +135,14 @@ def score_hungarian(hun,dub=2.5):
   hun.f1         = 2*hun.n_matched / (hun.n_proposed + hun.n_gt)
   return hun
 
-def listOfMatches_to_Scores(hungs):
+def listOfMatches_to_Scores(listOfMatches):
+  """
+  works for any matching that gives n_gt, n_proposed, and n_matched.
+  """
   res = SimpleNamespace()
-  res.n_gt = sum([h.n_gt for h in hungs])
-  res.n_proposed = sum([h.n_proposed for h in hungs])
-  res.n_matched  = sum([h.n_matched for h in hungs])
+  res.n_gt = sum([h.n_gt for h in listOfMatches])
+  res.n_proposed = sum([h.n_proposed for h in listOfMatches])
+  res.n_matched  = sum([h.n_matched for h in listOfMatches])
   res.precision  = res.n_matched / res.n_proposed
   res.recall     = res.n_matched / res.n_gt
   res.f1         = 2*res.n_matched / (res.n_proposed + res.n_gt)
@@ -144,16 +151,4 @@ def listOfMatches_to_Scores(hungs):
 
 
 
-def listOfMatches2Scores(matches):
-  """
-  matches is an Nx3 array with (n_matched, n_proposed, n_target) semantics.
-  """
-  matches = np.array(matches)
-  d = SimpleNamespace()
-  d.f1          = 2*matches[:,0].sum() / np.maximum(matches[:,[1,2]].sum(),1)
-  d.precision   =   matches[:,0].sum() / np.maximum(matches[:,1].sum(),1)
-  d.recall      =   matches[:,0].sum() / np.maximum(matches[:,2].sum(),1)
-  d.f1_2        = (2*matches[:,0] / np.maximum(matches[:,[1,2]].sum(1),1)).mean()
-  d.precision_2 = (  matches[:,0] / np.maximum(matches[:,1],1)).mean()
-  d.recall_2    = (  matches[:,0] / np.maximum(matches[:,2],1)).mean()
-  return d
+
