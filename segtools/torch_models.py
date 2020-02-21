@@ -52,13 +52,13 @@ def test_weights(net):
 
 ## 3d nets
 
-def conv2(c0,c1,c2,**kwargs):
+def conv2(c0,c1,c2,kernsize, padding):
   return nn.Sequential(
-    nn.Conv3d(c0,c1,**kwargs),
+    nn.Conv3d(c0,c1,kernsize, padding=padding),
     # nn.BatchNorm3d(c2),
     nn.ReLU(),
     # nn.Dropout3d(p=0.1),
-    nn.Conv3d(c1,c2,**kwargs),
+    nn.Conv3d(c1,c2,kernsize, padding=padding),
     # nn.BatchNorm3d(c2),
     nn.ReLU(),
     # nn.Dropout3d(p=0.1),
@@ -117,13 +117,13 @@ class Unet3(nn.Module):
   def __init__(self, c=32, io=[[1],[1]], finallayer=nn.LeakyReLU, pool=(1,2,2), kernsize=(3,5,5)):
     super(Unet3, self).__init__()
 
-    self.l_ab = conv2(io[0][0] ,c, c,kernsize=kernsize, padding=pool)
-    self.l_cd = conv2(1*c, 2*c, 2*c, kernsize=kernsize, padding=pool)
-    self.l_ef = conv2(2*c, 4*c, 4*c, kernsize=kernsize, padding=pool)
-    self.l_gh = conv2(4*c, 8*c, 4*c, kernsize=kernsize, padding=pool)
-    self.l_ij = conv2(8*c, 4*c, 2*c, kernsize=kernsize, padding=pool)
-    self.l_kl = conv2(4*c, 2*c, 1*c, kernsize=kernsize, padding=pool)
-    self.l_mn = conv2(2*c, 1*c, 1*c, kernsize=kernsize, padding=pool)
+    self.l_ab = conv2(io[0][0], c, c, kernsize, padding=pool)
+    self.l_cd = conv2(1*c, 2*c,  2*c, kernsize, padding=pool)
+    self.l_ef = conv2(2*c, 4*c,  4*c, kernsize, padding=pool)
+    self.l_gh = conv2(4*c, 8*c,  4*c, kernsize, padding=pool)
+    self.l_ij = conv2(8*c, 4*c,  2*c, kernsize, padding=pool)
+    self.l_kl = conv2(4*c, 2*c,  1*c, kernsize, padding=pool)
+    self.l_mn = conv2(2*c, 1*c,  1*c, kernsize, padding=pool)
     
     self.l_o  = nn.Sequential(nn.Conv3d(1*c,io[1][0],(1,1,1),padding=0), finallayer())
 
