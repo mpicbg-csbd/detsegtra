@@ -117,6 +117,10 @@ class Unet3(nn.Module):
   def __init__(self, c=32, io=[[1],[1]], finallayer=nn.LeakyReLU, pool=(1,2,2), kernsize=(3,5,5)):
     super(Unet3, self).__init__()
 
+    self.pool = pool
+    self.kernsize = kernsize
+    self.finallayer = finallayer
+
     self.l_ab = conv2(io[0][0], c, c, kernsize, padding=pool)
     self.l_cd = conv2(1*c, 2*c,  2*c, kernsize, padding=pool)
     self.l_ef = conv2(2*c, 4*c,  4*c, kernsize, padding=pool)
@@ -130,19 +134,19 @@ class Unet3(nn.Module):
   def forward(self, x):
 
     c1 = self.l_ab(x)
-    c2 = nn.MaxPool3d(pool)(c1)
+    c2 = nn.MaxPool3d(self.pool)(c1)
     c2 = self.l_cd(c2)
-    c3 = nn.MaxPool3d(pool)(c2)
+    c3 = nn.MaxPool3d(self.pool)(c2)
     c3 = self.l_ef(c3)
-    c4 = nn.MaxPool3d(pool)(c3)
+    c4 = nn.MaxPool3d(self.pool)(c3)
     c4 = self.l_gh(c4)
-    c4 = F.interpolate(c4,scale_factor=pool)
+    c4 = F.interpolate(c4,scale_factor=self.pool)
     c4 = torch.cat([c4,c3],1)
     c4 = self.l_ij(c4)
-    c4 = F.interpolate(c4,scale_factor=pool)
+    c4 = F.interpolate(c4,scale_factor=self.pool)
     c4 = torch.cat([c4,c2],1)
     c4 = self.l_kl(c4)
-    c4 = F.interpolate(c4,scale_factor=pool)
+    c4 = F.interpolate(c4,scale_factor=self.pool)
     c4 = torch.cat([c4,c1],1)
     c4 = self.l_mn(c4)
     out1 = self.l_o(c4)
