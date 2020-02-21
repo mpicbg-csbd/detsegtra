@@ -1,5 +1,6 @@
 from subprocess import call, Popen
 from pathlib import Path
+import shutil
 
 
 local_push    = Path("/Users/broaddus/Desktop/Projects/devseg_2_local/")
@@ -20,9 +21,9 @@ def rsync_pull(localpath="/Users/broaddus/Desktop/project-broaddus/devseg_2/e02/
     if localpath.exists(): shutil.rmtree(localpath)
 
   args = ""
-  args += " --exclude '*.pt' --exclude 'pred/Fluo*' "
-  args += " --include 'pred/mx_z/' "
-  args += " --exclude 'ta/mx_vali/' "
+  args += " --exclude '*.pt' --exclude 'pred/' "
+  # args += " --include 'pred/mx_z/' "
+  # args += " --exclude '*vali*' "
   if justfiles: args += " --exclude '*/'"
 
   call([f"mkdir -p {localpath}"],shell=True)

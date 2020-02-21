@@ -52,13 +52,13 @@ def test_weights(net):
 
 ## 3d nets
 
-def conv2(c0,c1,c2):
+def conv2(c0,c1,c2,**kwargs):
   return nn.Sequential(
-    nn.Conv3d(c0,c1,(3,5,5),padding=(1,2,2)),
+    nn.Conv3d(c0,c1,**kwargs),
     # nn.BatchNorm3d(c2),
     nn.ReLU(),
     # nn.Dropout3d(p=0.1),
-    nn.Conv3d(c1,c2,(3,5,5),padding=(1,2,2)),
+    nn.Conv3d(c1,c2,**kwargs),
     # nn.BatchNorm3d(c2),
     nn.ReLU(),
     # nn.Dropout3d(p=0.1),
@@ -114,35 +114,35 @@ class Unet3(nn.Module):
   The same exact shape we used for models submitted to ISBI. 2,767,777 params.
   """
 
-  def __init__(self, c=32, io=[[1],[1]], finallayer=nn.LeakyReLU, pool=(1,2,2)):
+  def __init__(self, c=32, io=[[1],[1]], finallayer=nn.LeakyReLU, pool=(1,2,2), kernsize=(3,5,5)):
     super(Unet3, self).__init__()
 
-    self.l_ab = conv2(io[0][0] ,c, c)
-    self.l_cd = conv2(1*c, 2*c, 2*c)
-    self.l_ef = conv2(2*c, 4*c, 4*c)
-    self.l_gh = conv2(4*c, 8*c, 4*c)
-    self.l_ij = conv2(8*c, 4*c, 2*c)
-    self.l_kl = conv2(4*c, 2*c, 1*c)
-    self.l_mn = conv2(2*c, 1*c, 1*c)
+    self.l_ab = conv2(io[0][0] ,c, c,kernsize=kernsize, padding=pool)
+    self.l_cd = conv2(1*c, 2*c, 2*c, kernsize=kernsize, padding=pool)
+    self.l_ef = conv2(2*c, 4*c, 4*c, kernsize=kernsize, padding=pool)
+    self.l_gh = conv2(4*c, 8*c, 4*c, kernsize=kernsize, padding=pool)
+    self.l_ij = conv2(8*c, 4*c, 2*c, kernsize=kernsize, padding=pool)
+    self.l_kl = conv2(4*c, 2*c, 1*c, kernsize=kernsize, padding=pool)
+    self.l_mn = conv2(2*c, 1*c, 1*c, kernsize=kernsize, padding=pool)
     
     self.l_o  = nn.Sequential(nn.Conv3d(1*c,io[1][0],(1,1,1),padding=0), finallayer())
 
   def forward(self, x):
 
     c1 = self.l_ab(x)
-    c2 = nn.MaxPool3d((1,2,2))(c1)
+    c2 = nn.MaxPool3d(pool)(c1)
     c2 = self.l_cd(c2)
-    c3 = nn.MaxPool3d((1,2,2))(c2)
+    c3 = nn.MaxPool3d(pool)(c2)
     c3 = self.l_ef(c3)
-    c4 = nn.MaxPool3d((1,2,2))(c3)
+    c4 = nn.MaxPool3d(pool)(c3)
     c4 = self.l_gh(c4)
-    c4 = F.interpolate(c4,scale_factor=(1,2,2))
+    c4 = F.interpolate(c4,scale_factor=pool)
     c4 = torch.cat([c4,c3],1)
     c4 = self.l_ij(c4)
-    c4 = F.interpolate(c4,scale_factor=(1,2,2))
+    c4 = F.interpolate(c4,scale_factor=pool)
     c4 = torch.cat([c4,c2],1)
     c4 = self.l_kl(c4)
-    c4 = F.interpolate(c4,scale_factor=(1,2,2))
+    c4 = F.interpolate(c4,scale_factor=pool)
     c4 = torch.cat([c4,c1],1)
     c4 = self.l_mn(c4)
     out1 = self.l_o(c4)
