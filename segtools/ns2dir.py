@@ -168,7 +168,7 @@ def _load_file(name):
 def toarray(sn):
   assert type(sn) is SimpleNamespace
   # def f(x): print(x);return x
-  return np.array([x for x in sn.__dict__.values() if type(x) is np.ndarray])
+  return np.array([x for x in sn.__dict__.values()]) # if type(x) is np.ndarray])
 
 def flatten(l):
   for el in l:

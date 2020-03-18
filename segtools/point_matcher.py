@@ -58,7 +58,10 @@ def match_unambiguous_nearestNeib(_pts_gt,_pts_yp,dub=10,scale=[1,1,1]):
   
   BUG: we never established a true matching, just the score.
   Our scheme was such that all gt points within `dub` distance of a yp were considered matched, even if that match was not unique.
-  This is probably not correct...
+  This makes sense if the matching region associated with a nucleus is _uniquely_ claimed by that nucleus (regions don't overlap).
+  If regions _do_ overlap, then this second criterion is active (nucleus center is nearest neib of proposed point).
+  We could solve an assignment problem with Hungarian matching to enable even more flexible matching.
+  This is only necessary if we have overlapping regions, and it might be possible that proposed point X matches to gt point Y1 even though it is closer to Y2.
   """
 
   res = SimpleNamespace()
