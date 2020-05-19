@@ -251,7 +251,7 @@ def apply_net_tiled_3d(net,img):
   Turns off gradients.
   Does not perform normalization.
   Applies net to image with dims Channels,Z,Y,X.
-  Assume 3x or less max pooling layers => (U-net) translational symmetry with period 2^n for n in [0,1,2,3].
+  Assume 3x or less max pooling layers => (U-net) discrete translational symmetry with period 2^n for n in [0,1,2,3].
   """
 
   # borders           = [8,24,24] ## border width within each patch that is thrown away after prediction
@@ -261,6 +261,7 @@ def apply_net_tiled_3d(net,img):
   # def g(n,m): return floor(n/m)*m-n ## f(n,m) gives un-padding needed for n to be divisible by m
   def f(n,m): return ceil(n/m)*m-n ## gives padding needed for n to be divisible by m
 
+  assert img.ndim==4
   a,b,c = img.shape[1:]
 
   ## extra border needed for stride % 8 = 0. read as e.g. "ImagePad_Z"

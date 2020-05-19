@@ -32,6 +32,8 @@ known_py_collections = [dict, set, list]
 
 def _is_scalar(x):
   if type(x) in known_scalars: return True
+  if 'float' in str(type(x)): return True
+  if 'int' in str(type(x)): return True
   if type(x) is np.ndarray and x.ndim==0: return True
   if type(x) is torch.Tensor and x.ndimension==0: return True
   return False
