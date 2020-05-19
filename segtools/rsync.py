@@ -1,13 +1,14 @@
-from subprocess import call, Popen
+from subprocess import run, Popen
 from pathlib import Path
 import shutil
+from .ns2dir import load,save
 
 
 local_push    = Path("/Users/broaddus/Desktop/Projects/devseg_2_local/")
 local_pull    = Path("/Users/broaddus/Desktop/project-broaddus/")
 remote        = Path("/projects/project-broaddus/")
 
-def rsync_pull(localpath="/Users/broaddus/Desktop/project-broaddus/devseg_2/e02/test/",cleardir=False,justfiles=False):
+def rsync_pull(localpath="/Users/broaddus/Desktop/project-broaddus/devseg_2/e02/test/",cleardir=False,justfiles=False,async=True):
 
   localpath = localpath.replace("/lustre/projects/project-broaddus/","/Users/broaddus/Desktop/project-broaddus/")
   localpath = localpath.replace("/projects/project-broaddus/","/Users/broaddus/Desktop/project-broaddus/")
@@ -26,10 +27,20 @@ def rsync_pull(localpath="/Users/broaddus/Desktop/project-broaddus/devseg_2/e02/
   # args += " --exclude '*vali*' "
   if justfiles: args += " --exclude '*/'"
 
-  call([f"mkdir -p {localpath}"],shell=True)
-  cmd = f"rsync -maP {args} efal:{remote}/{shared_extension} {local_pull}/{shared_extension} > rsync.out 2>&1"
+  ## rsync 
+  flags = ' -mapHAXxv --numeric-ids --delete --progress -e "ssh -T -c arcfour -o Compression=no -x" ' #user@<source>:<source_dir> <dest_dir>
+  flags = ' -mapv --numeric-ids --delete --progress '
+  args = flags + args
+  run([f"mkdir -p {localpath}"],shell=True)
+  cmd = f"rsync {args} efal:{remote}/{shared_extension} {local_pull}/{shared_extension} > rsync.out 2>&1"
   print(cmd)
-  Popen([cmd],shell=True)
+  _call = Popen if async else run
+  _call([cmd],shell=True)
+
+def qload():
+    rsync_pull("/Users/broaddus/Desktop/project-broaddus/devseg_2/src/qsave.tif", async=False)
+    img = load("/Users/broaddus/Desktop/project-broaddus/devseg_2/src/qsave.tif")
+    return img
 
 def rsync_push(localpath="/Users/broaddus/Desktop/project-broaddus/devseg_2/e02/test/"):
 

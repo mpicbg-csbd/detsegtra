@@ -122,22 +122,21 @@ def kernel_log_3d_2(sig=2,w=10):
     return kern
 
 
-## 
-
-def autocorrelation_2d(x):
+def autocorrelation(x):
   """
-  2D autocorrelation
+  nD autocorrelation
   remove mean per-patch (not global GT)
   normalize stddev to 1
+  value at zero shift normalized to 1...
   """
-  assert x.ndim == 2
   x = (x - np.mean(x))/np.std(x)
-  # x = np.pad(x, [(50,50),(50,50)], mode='constant')
-  f = np.fft.fft2(x)
-  p = np.abs(f)**2
-  pi = np.fft.ifft2(p)
-  pi = np.fft.fftshift(pi)
-  return pi.real
+  x  = np.fft.fftn(x)
+  x  = np.abs(x)**2
+  x = np.fft.ifftn(x).real
+  x = x / x.flat[0]
+  x = np.fft.fftshift(x)
+  return x
+
 
 ## deprecated
 

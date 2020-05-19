@@ -78,9 +78,9 @@ def _save_file(dir,name,v):
   if type(v) is np.ndarray and v.dtype == np.uint8 and (v.ndim==2 or (v.ndim==3 and v.shape[2] in [3,4])):
     io.imsave(dir/(name +'.png'),v)
   elif type(v) is np.ndarray:
-    # file = str(dir/(name +".tif"))
-    # tifffile.imsave(file,v,compress=0)
-    np.save(dir/(name +'.npy'),v)
+    file = str(dir/(name +".tif"))
+    tifffile.imsave(file,v,compress=0)
+    # np.save(dir/(name +'.npy'),v)
   elif type(v) in known_py_collections:
     try:
       json.dump(v,open(dir/(name +'.json'),'w'))
@@ -141,7 +141,6 @@ extension_to_write = {
   '.pkl':lambda  f,x : pickle.dump(x,open(f,'wb')),
   '.json':lambda f,x : json.dump(x,open(f,'w')),
   }
-
 
 
 def _load_file(name):
