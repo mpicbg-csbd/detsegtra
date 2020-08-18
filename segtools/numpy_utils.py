@@ -274,3 +274,11 @@ def plotgrid(lst, c=5):
   res = collapse2(res, 'iRCyxc','Ry,Cix,c')
   return res
 
+def norm_to_percentile_and_dtype(img1, img2, p0, p1):
+  "affine rescale img1 to img2 domain s.t. histogram percentiles match, then convert dtype"
+  p1_0, p1_1 = np.percentile(img1,[p0,p1])
+  p2_0, p2_1 = np.percentile(img2,[p0,p1])
+  img1 = (img1-p1_0)/(p1_1-p1_0) # norm to 0,1
+  img1 = img1*(p2_1-p2_0) + p2_0
+  img1 = img1.astype(img2.dtype)
+  return img1
