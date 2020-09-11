@@ -42,6 +42,9 @@ def qload():
     img = load("/Users/broaddus/Desktop/project-broaddus/devseg_2/src/qsave.tif")
     return img
 
+# def qsave(obj, dir='./'):
+#     save(obj, dir + "qsave")
+
 def rsync_push(localpath="/Users/broaddus/Desktop/project-broaddus/devseg_2/e02/test/"):
 
   localpath  = Path(localpath)

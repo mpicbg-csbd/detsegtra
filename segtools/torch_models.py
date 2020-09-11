@@ -274,8 +274,10 @@ def apply_net_tiled_3d(net,img, pp_zyx=(8,64,64), D_zyx=(48,400,400)):
   ## padding per patch. must be divisible by 8. read as e.g. "PatchPad_Z"
   # pp_z,pp_y,pp_x = 8,64,64
   pp_z,pp_y,pp_x = pp_zyx
+  # assert all([x%8==0 for x in pp_zyx])
   ## inner patch size (does not include patch border. also will be smaller at boundary)
   DZ,DY,DX = D_zyx
+  # assert all([x%8==0 for x in D_zyx])
 
   img_padded = np.pad(img,[(0,0),(pp_z,pp_z+ip_z),(pp_y,pp_y+ip_y),(pp_x,pp_x+ip_x)],mode='constant')
   output = np.zeros(img.shape)
