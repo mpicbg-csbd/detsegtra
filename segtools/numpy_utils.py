@@ -185,10 +185,17 @@ def sorted_uniques(img):
   counts = sorted(zip(a,b), key=lambda c: c[1])
   return counts
 
-def argmax3d(img):
+def argmaxnd(img):
   "equivalent to divmod chaining"
   # alternative: return np.argwhere(img == img.max()) -- this returns all equiv maxima.
   return np.unravel_index(img.argmax(), img.shape)
+
+def zerotrimmer(x):
+  aw = np.argwhere(x)
+  topleft = aw.min(0)
+  botright = aw.max(0)
+  ss = [slice(a,b+1) for a,b in zip(topleft,botright)]
+  return x[ss]
 
 def unique_across_axes(arr, axes):
   """

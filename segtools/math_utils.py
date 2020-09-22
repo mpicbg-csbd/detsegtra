@@ -242,23 +242,23 @@ def conv_at_pts2(pts,kern,sh,func=lambda a,b:a+b):
   return output
 
 
+# TODO: implement this
+# def place_gaussian_at_pts_subpixel(pts,s=[3,3],ks=[63,63],sh=[64,64]):
+#   """
+#   s  = sigma for gaussian
+#   ks = kernel size
+#   sh = target/container shape
+#   """
+#   s  = np.array(s)
+#   ks = np.array(ks)
 
-def place_gaussian_at_pts_subpixel(pts,s=[3,3],ks=[63,63],sh=[64,64]):
-  """
-  s  = sigma for gaussian
-  ks = kernel size
-  sh = target/container shape
-  """
-  s  = np.array(s)
-  ks = np.array(ks)
-
-  def f(x):
-    x = x - (ks-1)/2
-    return np.exp(-(x*x/s/s).sum()/2)
-  kern = np.array([f(x) for x in np.indices(ks).reshape((len(ks),-1)).T]).reshape(ks)
-  kern = kern / kern.max()
-  target = conv_at_pts4(pts,kern,sh,lambda a,b:np.maximum(a,b))
-  return target
+#   def f(x):
+#     x = x - (ks-1)/2
+#     return np.exp(-(x*x/s/s).sum()/2)
+#   kern = np.array([f(x) for x in np.indices(ks).reshape((len(ks),-1)).T]).reshape(ks)
+#   kern = kern / kern.max()
+#   target = conv_at_pts4(pts,kern,sh,lambda a,b:np.maximum(a,b))
+#   return target
 
 def place_gaussian_at_pts(pts,s=[3,3],ks=[63,63],sh=[64,64]):
   """

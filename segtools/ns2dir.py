@@ -90,7 +90,7 @@ def _save_file(dir,name,v):
       os.remove(dir/(name +'.json'))
       pickle.dump(v,open(dir/(name +'.pkl'),'wb'))
 
-def load(base,filtr='.'):
+def load(base,regex='.'):
   res  = dict()
   base = Path(base).resolve()
 
@@ -109,11 +109,11 @@ def load(base,filtr='.'):
       #   if 
 
     if d.is_dir():
-      obj = load(d,filtr=filtr)
+      obj = load(d,regex=regex)
       if len(obj.__dict__)>0:
         res[d2] = obj
 
-    if d.is_file() and d.suffix in known_filetypes and re.search(filtr,str(d)):
+    if d.is_file() and d.suffix in known_filetypes and re.search(regex,str(d)):
 
       obj = _load_file(d)
 
@@ -169,7 +169,7 @@ def _load_file(name):
 def toarray(sn):
   assert type(sn) is SimpleNamespace
   # def f(x): print(x);return x
-  return np.array([x for x in sn.__dict__.values() if type(x) is np.ndarray])
+  return np.array([x for x in sn.__dict__.values()])
 
 def flatten(l):
   for el in l:
