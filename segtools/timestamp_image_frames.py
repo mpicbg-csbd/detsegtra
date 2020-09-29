@@ -1,3 +1,8 @@
+"""
+This whole script is deprecated.
+Better to make movies using the imageio interface.
+"""
+
 import numpy as np
 from skimage import io
 import matplotlib.pyplot as plt
@@ -21,6 +26,7 @@ def imshow2(img, dpi_ratio=1, interpolation='nearest', cmap='gray', **kwargs):
   dpi = int(dpi_ratio*img.shape[0]/h)
   fig.set_dpi(dpi)
   return fig,ax
+
 def fit_fig_to_axis(fig,scale=1):
   bbox = fig.gca().get_window_extent().transformed(fig.dpi_scale_trans.inverted())
   fig.set_size_inches(bbox.width*scale, bbox.height*scale, forward=True)

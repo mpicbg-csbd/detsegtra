@@ -302,6 +302,7 @@ def _voronoi_finite_polygons_2d(vor, radius=None):
 
     return new_regions, np.asarray(new_vertices)
 
+@DeprecationWarning
 def fig2data(fig, shape):
   "https://stackoverflow.com/questions/35355930/matplotlib-figure-to-image-as-a-numpy-array"
   from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
@@ -320,3 +321,39 @@ def fig2data(fig, shape):
   image = np.fromstring(canvas.tostring_rgb(), dtype='uint8')
   image = image.reshape((int(height), int(width), 3))
   return image
+
+def mplrender(fig):
+  from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+  canvas = FigureCanvas(fig)
+  canvas.draw()       # draw the canvas, cache the renderer
+  image = np.fromstring(canvas.tostring_rgb(), dtype='uint8')
+  image = image.reshape(canvas.get_width_height()[::-1] + (3,))
+  return image
+
+def imshow2(img, dpi_ratio=1, interpolation='nearest', cmap='gray', **kwargs):
+  """
+  `fig1 = plt.figure()` must be called separately otherwise we get "No renderer defined" error if
+  we use the `fig1.draw` method. The workaround is to call fit_fig_to_axis TWICE!
+  This is the only way to both *create* a figure, and resize it in a single call.
+  But this breaks down if we call plot a second time on the same axes...
+  """
+  fig = plt.figure()
+  ax = fig.gca()
+  ax.imshow(img, interpolation=interpolation, cmap=cmap, **kwargs)
+  ax.axis('off')
+  ax.set_position([0,0,1,1])
+  w,h = fit_fig_to_axis(fig)
+  w,h = fit_fig_to_axis(fig)
+  dpi = int(dpi_ratio*img.shape[0]/h)
+  fig.set_dpi(dpi)
+  return fig,ax
+
+def fit_fig_to_img(fig,img,scale):
+    a,b = img.shape
+    fig.set_size_inches(b/210*scale,a/210*scale)
+
+@DeprecationWarning
+def fit_fig_to_axis(fig,scale=1):
+  bbox = fig.gca().get_window_extent().transformed(fig.dpi_scale_trans.inverted())
+  fig.set_size_inches(bbox.width*scale, bbox.height*scale, forward=True)
+  return bbox.width, bbox.height
