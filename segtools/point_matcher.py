@@ -5,9 +5,6 @@ from scipy.optimize import linear_sum_assignment
 import ipdb
 
 
-
-
-
 def match_points_single(pts_gt,pts_yp,dub=10):
   "pts_gt is ground truth. pts_yp as predictions. this function is not symmetric!"
   pts_gt = np.array(pts_gt)
@@ -66,16 +63,19 @@ def match_unambiguous_nearestNeib(_pts_gt,_pts_yp,dub=10,scale=[1,1,1]):
 
   res = SimpleNamespace()
 
+  if 0 in _pts_gt.shape or 0 in _pts_yp.shape:
+    res.n_matched  = 0
+    res.n_proposed = len(_pts_yp)
+    res.n_gt       = len(_pts_gt)
+    res.f1 = 0.0
+    res.precision = 0.0
+    res.recall = 0.0
+    # res.dists  = np.zeros(len(_pts_gt))-1
+    # res.gt2yp  = np.zeros(len(_pts_gt))-1
+    return res
+
   pts_gt = np.array(_pts_gt) * scale ## for matching in anisotropic spaces
   pts_yp = np.array(_pts_yp) * scale ## for matching in anisotropic spaces
-
-  if 0 in pts_gt.shape or 0 in pts_yp.shape:
-    res.n_matched  = 0
-    res.n_proposed = len(pts_yp)
-    res.n_gt       = len(pts_gt)
-    # res.dists  = np.zeros(len(pts_gt))-1
-    # res.gt2yp  = np.zeros(len(pts_gt))-1
-    return res
 
   kdt = pyKDTree(pts_yp)
   gt2yp_dists, gt2yp = kdt.query(pts_gt, k=1, distance_upper_bound=dub)
