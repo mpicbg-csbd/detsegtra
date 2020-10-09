@@ -86,12 +86,11 @@ def ptstak(pts):
     # return x
   return np.concatenate([f(i,x) for i,x in enumerate(pts)])
 
-
-def trim_images_from_pts2(pts):
+def trim_images_from_pts2(pts,border=(5,15,15)):
   "to transform pts, just subtract mn2. to crop image, apply ss."
   mn = pts.min(0)
   mx = pts.max(0)
-  mn2 = np.maximum(mn-(5,15,15),0)
-  mx2 = mx+(5,15,15)
-  ss = slice(mn2[0],mx2[0]), slice(mn2[1],mx2[1]), slice(mn2[2],mx2[2])
-  return mn2,ss
+  mn2 = np.maximum(mn-border,0)
+  mx2 = mx+border
+  ss = tuple(slice(mn2[i],mx2[i]) for i in range(len(border)))
+  return pts-mn2,ss
