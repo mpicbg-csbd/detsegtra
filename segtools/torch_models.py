@@ -246,6 +246,63 @@ import numpy as np
 import itertools
 from math import ceil
 
+def apply_net_2d(net,img,pp_zyx=(64,64), D_zyx=(400,400)):
+  """
+  Turns off gradients.
+  Does not perform normalization.
+  Applies net to image with dims Channels,Z,Y,X.
+  Assume 3x or less max pooling layers => (U-net) discrete translational symmetry with period 2^n for n in [0,1,2,3].
+  """
+
+  # borders           = [8,24,24] ## border width within each patch that is thrown away after prediction
+  # patchshape_padded = [32,240,240] ## the size of the patch that we feed into the net. must be divisible by 8 or net fails.
+  # patchshape        = [16,200,200] ## must be divisible by 8 to avoid artifacts.
+  # stride            = [16,200,200] ## same as patchshape in this case
+  # def g(n,m): return floor(n/m)*m-n ## f(n,m) gives un-padding needed for n to be divisible by m
+  def f(n,m): return ceil(n/m)*m-n ## gives padding needed for n to be divisible by m
+
+  assert img.ndim==3
+  b,c = img.shape[1:]
+
+  ## extra border needed for stride % 8 = 0. read as e.g. "ImagePad_Z"
+  ip_y,ip_x = f(b,8),f(c,8)
+  
+  # pp_z,pp_y,pp_x = 8,32,32
+  # DZ,DY,DX = 16,200,200
+
+  ## max total size with Unet3 16 input channels (64,528,528) = 
+  ## padding per patch. must be divisible by 8. read as e.g. "PatchPad_Z"
+  # pp_z,pp_y,pp_x = 8,64,64
+  pp_y,pp_x = pp_zyx
+  # assert all([x%8==0 for x in pp_zyx])
+  ## inner patch size (does not include patch border. also will be smaller at boundary)
+  DY,DX = D_zyx
+  # assert all([x%8==0 for x in D_zyx])
+
+  img_padded = np.pad(img,[(0,0),(pp_y,pp_y+ip_y),(pp_x,pp_x+ip_x)],mode='constant')
+  output = np.zeros(img.shape)
+
+  ## start coordinates for each patch in the padded input. each stride must be divisible by 8.
+  # zs = np.r_[:a:DZ]
+  ys = np.r_[:b:DY]
+  xs = np.r_[:c:DX]
+
+  ## start coordinates of padded input (e.g. top left patch corner)
+  for x,y in itertools.product(xs,ys):
+    ## end coordinates of padded input (including patch border)
+    ye,xe = min(y+DY,b+ip_y) + 2*pp_y, min(x+DX,c+ip_x) + 2*pp_x
+    patch = img_padded[:,y:ye,x:xe]
+    with torch.no_grad():
+      patch = torch.from_numpy(patch).cuda().float()
+      patch = net(patch[None])[0,:,pp_y:-pp_y,pp_x:-pp_x].detach().cpu().numpy()
+    ## end coordinates of unpadded output (not including border)
+    be,ce = min(y+DY,b),min(x+DX,c)
+    ## use "ae-z" because patch size changes near boundary
+    output[:,y:be,x:ce] = patch[:,:be-y,:ce-x]
+
+  return output
+
+
 def apply_net_tiled_3d(net,img, pp_zyx=(8,64,64), D_zyx=(48,400,400)):
   """
   Turns off gradients.
