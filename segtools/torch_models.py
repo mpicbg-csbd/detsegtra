@@ -259,6 +259,14 @@ def apply_net_2d(net,img,pp_zyx=(64,64), D_zyx=(400,400)):
   # patchshape        = [16,200,200] ## must be divisible by 8 to avoid artifacts.
   # stride            = [16,200,200] ## same as patchshape in this case
   # def g(n,m): return floor(n/m)*m-n ## f(n,m) gives un-padding needed for n to be divisible by m
+
+  # a,b = img.shape[-2:]
+  # if a<800 and b<800:
+  #   with torch.no_grad():
+  #     x = torch.from_numpy(img).cuda().float()
+  #     return net(x[None])[0].detach().cpu().numpy()
+
+
   def f(n,m): return ceil(n/m)*m-n ## gives padding needed for n to be divisible by m
 
   assert img.ndim==3
@@ -279,7 +287,7 @@ def apply_net_2d(net,img,pp_zyx=(64,64), D_zyx=(400,400)):
   DY,DX = D_zyx
   # assert all([x%8==0 for x in D_zyx])
 
-  img_padded = np.pad(img,[(0,0),(pp_y,pp_y+ip_y),(pp_x,pp_x+ip_x)],mode='constant')
+  img_padded = np.pad(img,[(0,0),(pp_y,pp_y+ip_y),(pp_x,pp_x+ip_x)],mode='reflect')
   output = np.zeros(img.shape)
 
   ## start coordinates for each patch in the padded input. each stride must be divisible by 8.
@@ -301,7 +309,6 @@ def apply_net_2d(net,img,pp_zyx=(64,64), D_zyx=(400,400)):
     output[:,y:be,x:ce] = patch[:,:be-y,:ce-x]
 
   return output
-
 
 def apply_net_tiled_3d(net,img, pp_zyx=(8,64,64), D_zyx=(48,400,400)):
   """
@@ -336,7 +343,7 @@ def apply_net_tiled_3d(net,img, pp_zyx=(8,64,64), D_zyx=(48,400,400)):
   DZ,DY,DX = D_zyx
   # assert all([x%8==0 for x in D_zyx])
 
-  img_padded = np.pad(img,[(0,0),(pp_z,pp_z+ip_z),(pp_y,pp_y+ip_y),(pp_x,pp_x+ip_x)],mode='constant')
+  img_padded = np.pad(img,[(0,0),(pp_z,pp_z+ip_z),(pp_y,pp_y+ip_y),(pp_x,pp_x+ip_x)],mode='reflect')
   output = np.zeros(img.shape)
 
   ## start coordinates for each patch in the padded input. each stride must be divisible by 8.
@@ -358,3 +365,38 @@ def apply_net_tiled_3d(net,img, pp_zyx=(8,64,64), D_zyx=(48,400,400)):
     output[:,z:ae,y:be,x:ce] = patch[:,:ae-z,:be-y,:ce-x]
 
   return output
+
+
+def predict_raw(net,img,dims,**kwargs3d):
+  """
+  each elem of N dimension sent to gpu separately.
+  When possible, try to make the output dimensions match the input dimensions by e.g. removing singleton dims.
+  """
+  assert dims in ["NCYX","NBCYX","CYX","ZYX","CZYX","NCZYX","NZYX","YX"]
+
+  with torch.no_grad():
+    if dims=="NCYX":
+      def f(i): return net(torch.from_numpy(img[[i]]).cuda().float()).cpu().numpy()[0]
+      res = np.array([f(i) for i in range(img.shape[0])])
+    if dims=="NBCYX":
+      def f(i): return net(torch.from_numpy(img[i]).cuda().float()).cpu().numpy()
+      res = np.array([f(i) for i in range(img.shape[0])])
+    if dims=="CYX":
+      res = apply_net_2d(net,img,)
+      # res = net(torch.from_numpy(img[None]).cuda().float()).cpu().numpy()[0]
+    if dims=="YX":
+      res = apply_net_2d(net,img[None],)[0]
+      # res = net(torch.from_numpy(img[None,None]).cuda().float()).cpu().numpy()[0,0]
+    if dims=="ZYX":
+      ## assume 1 channel. remove after prediction.
+      res = apply_net_tiled_3d(net,img[None],**kwargs3d)[0]
+    if dims=="CZYX":
+      res = apply_net_tiled_3d(net,img)
+    if dims=="NCZYX":
+      def f(i): return apply_net_tiled_3d(net,img[i],**kwargs3d)[0]
+      res = np.array([f(i) for i in range(img.shape[0])])
+    if dims=="NZYX":
+      def f(i): return apply_net_tiled_3d(net,img[i,None],**kwargs3d)[0]
+      res = np.array([f(i) for i in range(img.shape[0])])
+
+  return res

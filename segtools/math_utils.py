@@ -317,6 +317,7 @@ def test_conv_at_pts_multikern_1d():
 
 def conv_at_pts_multikern(pts,kerns,sh,func=lambda a,b:np.maximum(a,b),beyond_borders=False):
   
+  if len(kerns)==0: return np.zeros(sh)
   kern_shapes = np.array([k.shape for k in kerns])
   local_coord_center = kern_shapes//2
   min_extent  = (pts - local_coord_center).min(0).clip(max=[0]*len(sh))
