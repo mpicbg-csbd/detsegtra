@@ -44,7 +44,8 @@ def moments_simple_2nd(img):
     mu[1, 1, 1] = np.sum(ind[0]*ind[1]*ind[2]*img)
     return mu
 
-@jit('f4[:,:,:](f4[:,:,:],f4[:],u1)')
+# @jit('f4[:,:,:](f4[:,:,:],f4[:],u1)')
+@jit
 def moments_central(image, cen, max_order):
     # cdef Py_ssize_t p, q, r, c
     mu = np.zeros((max_order + 1, max_order + 1, max_order + 1), dtype=np.double)
@@ -241,7 +242,6 @@ def conv_at_pts2(pts,kern,sh,func=lambda a,b:a+b):
   output = output[a:-a,b:-b,c:-c]
   return output
 
-
 # TODO: implement this
 # def place_gaussian_at_pts_subpixel(pts,s=[3,3],ks=[63,63],sh=[64,64]):
 #   """
@@ -251,7 +251,7 @@ def conv_at_pts2(pts,kern,sh,func=lambda a,b:a+b):
 #   """
 #   s  = np.array(s)
 #   ks = np.array(ks)
-
+# 
 #   def f(x):
 #     x = x - (ks-1)/2
 #     return np.exp(-(x*x/s/s).sum()/2)
@@ -260,14 +260,14 @@ def conv_at_pts2(pts,kern,sh,func=lambda a,b:a+b):
 #   target = conv_at_pts4(pts,kern,sh,lambda a,b:np.maximum(a,b))
 #   return target
 
-def place_gaussian_at_pts(pts,s=[3,3],ks=[63,63],sh=[64,64]):
+def place_gaussian_at_pts(pts,sigmas=[3,3],shape=[64,64]):
   """
-  s  = sigma for gaussian
-  ks = kernel size
-  sh = target/container shape
+  sigmas  = sigma for gaussian
+  shape = target/container shape
   """
-  s  = np.array(s)
-  ks = np.array(ks)
+  s  = np.array(sigmas)
+  ks = (7*s).astype(int) ## must be odd
+  sh = shape
 
   def f(x):
     x = x - (ks-1)/2
@@ -276,6 +276,18 @@ def place_gaussian_at_pts(pts,s=[3,3],ks=[63,63],sh=[64,64]):
   kern = kern / kern.max()
   target = conv_at_pts4(pts,kern,sh,lambda a,b:np.maximum(a,b))
   return target
+
+# def place_gaussian_at_pts(pts,sh=(,sigmas):
+#   s  = np.array(sigmas)
+#   ks = (s*7).astype(np.int) ## must be ODD
+#   def f(x):
+#     x = x - (ks-1)/2
+#     return np.exp(-(x*x/s/s).sum()/2)
+#   kern = np.array([f(x) for x in np.indices(ks).reshape((len(ks),-1)).T]).reshape(ks)
+#   kern = kern / kern.max()
+#   target = conv_at_pts4(pts,kern,sh,lambda a,b:np.maximum(a,b))
+#   return target
+
 
 def conv_at_pts4(pts,kern,sh,func=lambda a,b:a+b):
   "kernel is centered on pts. kern must have odd shape. sh is shape of output array."

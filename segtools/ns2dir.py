@@ -94,7 +94,11 @@ def load(base,regex='.'):
   res  = dict()
   base = Path(base).resolve()
 
-  if base.is_file(): return _load_file(base) ## ignore filter
+  if not base.exists(): print("MIssing: ", base)
+
+  # import ipdb; ipdb.set_trace()
+  if base.suffix in known_filetypes:
+    return _load_file(base) ## ignore filter
 
   from segtools.python_utils import sorted_alphanum
   for d in sorted_alphanum(map(str, (base.iterdir()))):
