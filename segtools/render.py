@@ -1,6 +1,6 @@
 import numpy as np
 from numba import jit
-
+import matplotlib.pyplot as plt
 
 ## utils
 
@@ -37,6 +37,14 @@ def get_fnz_idx2d(lab,ax=0):
   idx2d = np.where(mask.any(axis=ax), mask.argmax(axis=ax), -1)
   return idx2d
 
+def rgb_max(img):
+  x1 = img.max(0)
+  x2 = img.argmax(0)
+  x1 = x1/x1.max()
+  x2 = x2/x2.max()
+  x3 = plt.cm.Spectral(x2) * x1[...,None]
+  x3[...,3] = 1
+  return x3
 
 ### old use get_fnz_idx2d instead
 @DeprecationWarning
@@ -52,7 +60,6 @@ def coord_first_nonzero(arr, axis, invalid_val=-1):
   res = imgidx(arr, ids)
   return res
 
-## 
 
 def decay(arr, rate=0.02):
   "as rate goes to 0 decay goes to max projection. only along z-dimension. higher z-index = deeper tissue. similar to spimagine w alphaPow>0"
