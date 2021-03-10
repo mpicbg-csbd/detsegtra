@@ -10,6 +10,7 @@ import re
 import torch
 import collections
 from scipy.io import loadmat
+import zarr
 
 import shutil
 import ipdb
@@ -26,7 +27,7 @@ def clean(s):
   s = s2 if s2 else "d"+s
   return s
 
-known_filetypes = ['.npy', '.png', '.tif', '.tiff', '.pkl', '.json', '.mat']
+known_filetypes = ['.npy', '.png', '.tif', '.tiff', '.pkl', '.json', '.mat', '.zarr']
 known_scalars = [bool,int,tuple,range,float,str,bytes,Path,PosixPath]
 known_py_collections = [dict, set, list]
 # known_array_collection = [np.ndarray, torch.Tensor]
@@ -145,6 +146,7 @@ extension_to_read = {
   '.pkl': lambda f : pickle.load(open(f,'rb')),
   '.json':lambda f : json.load(open(f,'r')),
   '.mat': lambda f : SimpleNamespace(**loadmat(f)),
+  '.zarr':lambda f : zarr.open_array(str(f)),
   }
 
 extension_to_write = {
@@ -154,6 +156,7 @@ extension_to_write = {
   '.tiff':lambda f,x : tifffile.imsave(str(f),x),
   '.pkl':lambda  f,x : pickle.dump(x,open(f,'wb')),
   '.json':lambda f,x : json.dump(x,open(f,'w')),
+  '.zarr':lambda f,x : zarr.save_array(str(f),x),
   }
 
 
