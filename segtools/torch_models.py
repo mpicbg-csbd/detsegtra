@@ -273,15 +273,13 @@ def cpuStats():
   memoryUse = py.memory_info()[0] / 2. ** 30  # memory use in GB...I think
   print('memory GB:', memoryUse)
 
-
-
 ## prediction with tiling
 
 import numpy as np
 import itertools
 from math import ceil
 
-def apply_net_2d(net,img,pp_zyx=(64,64), D_zyx=(400,400)):
+def apply_net_2d(net,img,patch_boundary=(128,128),patch_inner=(256,256)):
   """
   Turns off gradients.
   Does not perform normalization.
@@ -316,13 +314,13 @@ def apply_net_2d(net,img,pp_zyx=(64,64), D_zyx=(400,400)):
   ## max total size with Unet3 16 input channels (64,528,528) = 
   ## padding per patch. must be divisible by 8. read as e.g. "PatchPad_Z"
   # pp_z,pp_y,pp_x = 8,64,64
-  pp_y,pp_x = pp_zyx
-  # assert all([x%8==0 for x in pp_zyx])
+  pp_y,pp_x = patch_boundary
+  # assert all([x%8==0 for x in patch_boundary])
   ## inner patch size (does not include patch border. also will be smaller at boundary)
-  DY,DX = D_zyx
-  # assert all([x%8==0 for x in D_zyx])
+  DY,DX = patch_inner
+  # assert all([x%8==0 for x in patch_inner])
 
-  img_padded = np.pad(img,[(0,0),(pp_y,pp_y+ip_y),(pp_x,pp_x+ip_x)],mode='reflect')
+  img_padded = np.pad(img,[(0,0),(pp_y,pp_y+ip_y),(pp_x,pp_x+ip_x)],mode='constant')
   output = np.zeros(img.shape)
 
   ## start coordinates for each patch in the padded input. each stride must be divisible by 8.
@@ -332,6 +330,7 @@ def apply_net_2d(net,img,pp_zyx=(64,64), D_zyx=(400,400)):
 
   ## start coordinates of padded input (e.g. top left patch corner)
   for x,y in itertools.product(xs,ys):
+    print(x,y)
     ## end coordinates of padded input (including patch border)
     ye,xe = min(y+DY,b+ip_y) + 2*pp_y, min(x+DX,c+ip_x) + 2*pp_x
     patch = img_padded[:,y:ye,x:xe]
@@ -378,7 +377,7 @@ def apply_net_tiled_3d(net,img, pp_zyx=(8,64,64), D_zyx=(48,400,400)):
   DZ,DY,DX = D_zyx
   # assert all([x%8==0 for x in D_zyx])
 
-  img_padded = np.pad(img,[(0,0),(pp_z,pp_z+ip_z),(pp_y,pp_y+ip_y),(pp_x,pp_x+ip_x)],mode='reflect')
+  img_padded = np.pad(img,[(0,0),(pp_z,pp_z+ip_z),(pp_y,pp_y+ip_y),(pp_x,pp_x+ip_x)],mode='constant')
   chanOUT = 1
   output = np.zeros((chanOUT,a,b,c))
 
@@ -402,7 +401,7 @@ def apply_net_tiled_3d(net,img, pp_zyx=(8,64,64), D_zyx=(48,400,400)):
 
   return output
 
-def predict_raw(net,img,dims,**kwargs3d):
+def predict_raw(net,img,dims,**kwargs):
   """
   each elem of N dimension sent to gpu separately.
   When possible, try to make the output dimensions match the input dimensions by e.g. removing singleton dims.
@@ -411,27 +410,29 @@ def predict_raw(net,img,dims,**kwargs3d):
 
   with torch.no_grad():
     if dims=="NCYX":
-      def f(i): return net(torch.from_numpy(img[[i]]).cuda().float()).cpu().numpy()[0]
+      # def f(i): return net(torch.from_numpy(img[[i]]).cuda().float()).cpu().numpy()[0]
+      def f(i): return apply_net_2d(net,img[[i]],**kwargs)
       res = np.array([f(i) for i in range(img.shape[0])])
     if dims=="NBCYX":
-      def f(i): return net(torch.from_numpy(img[i]).cuda().float()).cpu().numpy()
+      # def f(i): return net(torch.from_numpy(img[i]).cuda().float()).cpu().numpy()
+      def f(i): return apply_net_2d(net,img[i],**kwargs)
       res = np.array([f(i) for i in range(img.shape[0])])
     if dims=="CYX":
-      res = apply_net_2d(net,img,)
+      res = apply_net_2d(net,img,**kwargs)
       # res = net(torch.from_numpy(img[None]).cuda().float()).cpu().numpy()[0]
     if dims=="YX":
-      res = apply_net_2d(net,img[None],)[0]
+      res = apply_net_2d(net,img[None],**kwargs)[0]
       # res = net(torch.from_numpy(img[None,None]).cuda().float()).cpu().numpy()[0,0]
     if dims=="ZYX":
       ## assume 1 channel. remove after prediction.
-      res = apply_net_tiled_3d(net,img[None],**kwargs3d)[0]
+      res = apply_net_tiled_3d(net,img[None],**kwargs)[0]
     if dims=="CZYX":
       res = apply_net_tiled_3d(net,img)
     if dims=="NCZYX":
-      def f(i): return apply_net_tiled_3d(net,img[i],**kwargs3d)[0]
+      def f(i): return apply_net_tiled_3d(net,img[i],**kwargs)[0]
       res = np.array([f(i) for i in range(img.shape[0])])
     if dims=="NZYX":
-      def f(i): return apply_net_tiled_3d(net,img[i,None],**kwargs3d)[0]
+      def f(i): return apply_net_tiled_3d(net,img[i,None],**kwargs)[0]
       res = np.array([f(i) for i in range(img.shape[0])])
 
   return res
