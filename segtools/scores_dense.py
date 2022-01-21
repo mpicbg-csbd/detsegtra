@@ -71,24 +71,25 @@ def matching_max(psg):
 def seg(lab_gt, lab, partial_dataset=False):
   """
   calculate seg from pixel_sharing_bipartite
-  seg is the average conditional-iou across ground truth cells
-  conditional-iou gives zero if not in matching
+  SEG is the average maximum single-object IoU across ground truth cells with a unique match.
+  Two cells match if the intersection covers at least 50% of the Ground Truth object.
+  WARNING: This measure does not penalize for False Positives!
   ----
   calculate conditional intersection over union (CIoU) from matching & pixel_sharing_bipartite
   for a fraction > 0.5 matching. Any CIoU between matching pairs will be > 1/3. But there may be some
   IoU as low as 1/2 that don't match, and thus have CIoU = 0.
   """
   psg = pixel_sharing_bipartite(lab_gt, lab)
-  iou = intersection_over_union(psg)
   matching = matching_overlap(psg, fractions=(0.5, 0))
-  matching[0,:] = False
-  matching[:,0] = False
-  n_gt = len(set(np.unique(lab_gt)) - {0})
-  n_matched = iou[matching].sum()
+  matching[0,:] = 0
+  matching[:,0] = 0
+  n_gt = len(set(np.unique(lab_gt)) - {0}) ## zero label is always background
+  iou = intersection_over_union(psg)
+  iou_sum = iou[matching].sum()
   if partial_dataset:
-    return n_matched , n_gt
+    return iou_sum , n_gt
   else:
-    return n_matched / n_gt
+    return iou_sum / n_gt
 
 def matching_IOU(lab_gt, lab, iou=0.5, partial_dataset=False):
   """
@@ -108,13 +109,7 @@ def matching_IOU(lab_gt, lab, iou=0.5, partial_dataset=False):
 
 def det(lab_gt, lab, return_counts=True):
   """
-  calculate seg from pixel_sharing_bipartite
-  seg is the average conditional-iou across ground truth cells
-  conditional-iou gives zero if not in matching
-  ----
-  calculate conditional intersection over union (CIoU) from matching & pixel_sharing_bipartite
-  for a fraction > 0.5 matching. Any CIoU between matching pairs will be > 1/3. But there may be some
-  IoU as low as 1/2 that don't match, and thus have CIoU = 0.
+  As defined here http://celltrackingchallenge.net/evaluation-methodology/
   """
   psg = pixel_sharing_bipartite(lab_gt, lab)
   iou = intersection_over_union(psg)
@@ -178,15 +173,15 @@ def _det(res, ignore_FP=False):
   n_pro_ns = res.n_pro_ns
 
   ## ISBI Cell Tracking Challenge Weights
-  wNS = 5 # for vertex splitting, 
-  wFN = 10  # for vertex adding, 
-  wFP = 1 # for vertex deleting, wED = 1 for edge
+  wNS = 5  # Node Splitting
+  wFN = 10 # False Negative Node
+  wFP = 1  # False Positive Node  
 
-  aogm0 = wFN*n_gt ## every object is a false negative
+  aogm0 = wFN*n_gt ## worst case scenario: every object is a false negative
   aogm  = wNS*n_pro_ns + wFN*n_ref_fn
   if not ignore_FP: aogm += wFP*n_pro_fp 
   
-  aogm  = 1 - min(aogm, aogm0) / aogm0 ## as defined here http://celltrackingchallenge.net/evaluation-methodology/
+  aogm  = 1 - min(aogm, aogm0) / aogm0
 
   return aogm
 

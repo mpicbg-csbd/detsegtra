@@ -122,7 +122,6 @@ def kernel_log_3d_2(sig=2,w=10):
     kern = kern/kern.sum()
     return kern
 
-
 def autocorrelation(x):
   """
   nD autocorrelation
@@ -141,6 +140,7 @@ def autocorrelation(x):
 
 ## deprecated
 
+@DeprecationWarning
 def centered_kernel_nd(func, w=[10,10,10]):
   """
   Deprecated in favor of technique like the following:
@@ -166,6 +166,7 @@ def centered_kernel_nd(func, w=[10,10,10]):
   res = np.array(res).reshape(dom.shape[1:])
   return res
 
+@DeprecationWarning
 def place_gauss_at_pts(pts, w=[6,6,6]):
   # assert w[0]%1==0
   w  = np.array(w)
@@ -259,13 +260,15 @@ def conv_at_pts2(pts,kern,sh,func=lambda a,b:a+b):
 #   target = conv_at_pts4(pts,kern,sh,lambda a,b:np.maximum(a,b))
 #   return target
 
+@DeprecationWarning
 def place_gaussian_at_pts(pts,sigmas=[3,3],shape=[64,64]):
   """
   sigmas  = sigma for gaussian
   shape = target/container shape
   """
   s  = np.array(sigmas)
-  ks = (7*s).astype(int) ## must be odd
+  ks = (7*s).astype(int)
+  ks = ks - ks%2 + 1## enfore ODD shape so kernel is centered! (grow even dims by 1 pix)
   sh = shape
 
   def f(x):
