@@ -3,9 +3,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 
+from types import SimpleNamespace
 from torchsummary import summary
 
-import gc,sys,psutil,os,py
+import gc,sys,psutil,os #,py
 
 
 @DeprecationWarning
@@ -269,8 +270,8 @@ def cpuStats():
   print(psutil.cpu_percent())
   print(psutil.virtual_memory())  # physical memory usage
   pid = os.getpid()
-  py = psutil.Process(pid)
-  memoryUse = py.memory_info()[0] / 2. ** 30  # memory use in GB...I think
+  proc = psutil.Process(pid)
+  memoryUse = proc.memory_info()[0] / 2. ** 30  # memory use in GB...I think
   print('memory GB:', memoryUse)
 
 ## prediction with tiling
@@ -279,7 +280,7 @@ import numpy as np
 import itertools
 from math import ceil
 
-def apply_net_2d(net,img,patch_boundary=(128,128),patch_inner=(256,256)):
+def apply_net_2d(net,img,outchan=1,patch_boundary=(128,128),patch_inner=(256,256)):
   """
   Turns off gradients.
   Does not perform normalization.
@@ -321,7 +322,7 @@ def apply_net_2d(net,img,patch_boundary=(128,128),patch_inner=(256,256)):
   # assert all([x%8==0 for x in patch_inner])
 
   img_padded = np.pad(img,[(0,0),(pp_y,pp_y+ip_y),(pp_x,pp_x+ip_x)],mode='constant')
-  output = np.zeros(img.shape)
+  output = np.zeros((outchan,b,c))
 
   ## start coordinates for each patch in the padded input. each stride must be divisible by 8.
   # zs = np.r_[:a:DZ]
@@ -330,12 +331,11 @@ def apply_net_2d(net,img,patch_boundary=(128,128),patch_inner=(256,256)):
 
   ## start coordinates of padded input (e.g. top left patch corner)
   for x,y in itertools.product(xs,ys):
-    print(x,y)
     ## end coordinates of padded input (including patch border)
     ye,xe = min(y+DY,b+ip_y) + 2*pp_y, min(x+DX,c+ip_x) + 2*pp_x
     patch = img_padded[:,y:ye,x:xe]
     with torch.no_grad():
-      patch = torch.from_numpy(patch).cuda().float()
+      patch = torch.from_numpy(patch).float().cuda()
       patch = net(patch[None])[0,:,pp_y:-pp_y,pp_x:-pp_x].detach().cpu().numpy()
     ## end coordinates of unpadded output (not including border)
     be,ce = min(y+DY,b),min(x+DX,c)
@@ -344,7 +344,79 @@ def apply_net_2d(net,img,patch_boundary=(128,128),patch_inner=(256,256)):
 
   return output
 
-def apply_net_tiled_3d(net,img, pp_zyx=(8,64,64), D_zyx=(48,400,400)):
+# def apply_net_2d_noborder(net,img,outchan=1,patch_boundary=(128,128),patch_inner=(256,256)):
+#   """
+#   Turns off gradients.
+#   Does not perform normalization.
+#   Applies net to image with dims Channels,Z,Y,X.
+#   Assume 3x or less max pooling layers => (U-net) discrete translational symmetry with period 2^n for n in [0,1,2,3].
+#   """
+
+#   # borders           = [8,24,24] ## border width within each patch that is thrown away after prediction
+#   # patchshape_padded = [32,240,240] ## the size of the patch that we feed into the net. must be divisible by 8 or net fails.
+#   # patchshape        = [16,200,200] ## must be divisible by 8 to avoid artifacts.
+#   # stride            = [16,200,200] ## same as patchshape in this case
+#   # def g(n,m): return floor(n/m)*m-n ## f(n,m) gives un-padding needed for n to be divisible by m
+
+#   # a,b = img.shape[-2:]
+#   # if a<800 and b<800:
+#   #   with torch.no_grad():
+#   #     x = torch.from_numpy(img).cuda().float()
+#   #     return net(x[None])[0].detach().cpu().numpy()
+
+
+#   def f(n,m): return ceil(n/m)*m-n ## gives padding needed for n to be divisible by m
+
+#   assert img.ndim==3
+#   b,c = img.shape[1:]
+
+#   ## extra border needed for stride % 8 = 0. read as e.g. "ImagePad_Z"
+#   # ip_y,ip_x = f(b,8),f(c,8)
+  
+#   # pp_z,pp_y,pp_x = 8,32,32
+#   # DZ,DY,DX = 16,200,200
+
+#   ## max total size with Unet3 16 input channels (64,528,528) = 
+#   ## padding per patch. must be divisible by 8. read as e.g. "PatchPad_Z"
+#   # pp_z,pp_y,pp_x = 8,64,64
+#   pp_y,pp_x = patch_boundary
+#   # assert all([x%8==0 for x in patch_boundary])
+#   ## inner patch size (does not include patch border. also will be smaller at boundary)
+#   DY,DX = patch_inner
+#   ps_y,ps_x = np.array(patch_boundary)*2 + patch_inner
+#   # assert all([x%8==0 for x in patch_inner])
+
+#   # img_padded = np.pad(img,[(0,0),(pp_y,pp_y+ip_y),(pp_x,pp_x+ip_x)],mode='constant')
+#   output = np.zeros((outchan,b,c))
+
+#   ## start coordinates for each patch in the padded input. each stride must be divisible by 8.
+#   # zs = np.r_[:a:DZ]
+
+#   ys  = np.r_[:b-ps_y:DY, b-ps_y] ## patch-start coordinate
+#   ys2 = ys+pp_y; ys2[0]=0 ## start-coord of inner slice (inclusive)
+#   ys3 = ys+ps_y-pp_y; ys3[-1]=b ## end-coordinate of inner slice (exclusive)
+
+#   # for y in ys:
+#   # xs = np.r_[:c-ps_x:DX, c-DX]
+  
+#   # iterdims()
+
+#   ## start coordinates of padded input (e.g. top left patch corner)
+#   for x,y in itertools.product(xs,ys):
+#     ## end coordinates of padded input (including patch border)
+#     ye,xe = min(y+DY,b+ip_y) + 2*pp_y, min(x+DX,c+ip_x) + 2*pp_x
+#     patch = img_padded[:,y:ye,x:xe]
+#     with torch.no_grad():
+#       patch = torch.from_numpy(patch).float().cuda()
+#       patch = net(patch[None])[0,:,pp_y:-pp_y,pp_x:-pp_x].detach().cpu().numpy()
+#     ## end coordinates of unpadded output (not including border)
+#     be,ce = min(y+DY,b),min(x+DX,c)
+#     ## use "ae-z" because patch size changes near boundary
+#     output[:,y:be,x:ce] = patch[:,:be-y,:ce-x]
+
+#   return output
+
+def apply_net_tiled_3d(net,img,outchan=1,pp_zyx=(8,64,64), D_zyx=(48,400,400)):
   """
   Turns off gradients.
   Does not perform normalization.
@@ -378,8 +450,8 @@ def apply_net_tiled_3d(net,img, pp_zyx=(8,64,64), D_zyx=(48,400,400)):
   # assert all([x%8==0 for x in D_zyx])
 
   img_padded = np.pad(img,[(0,0),(pp_z,pp_z+ip_z),(pp_y,pp_y+ip_y),(pp_x,pp_x+ip_x)],mode='constant')
-  chanOUT = 1
-  output = np.zeros((chanOUT,a,b,c))
+  # outchan = 1
+  output = np.zeros((outchan,a,b,c))
 
   ## start coordinates for each patch in the padded input. each stride must be divisible by 8.
   zs = np.r_[:a:DZ]
@@ -392,7 +464,7 @@ def apply_net_tiled_3d(net,img, pp_zyx=(8,64,64), D_zyx=(48,400,400)):
     ze,ye,xe = min(z+DZ,a+ip_z) + 2*pp_z, min(y+DY,b+ip_y) + 2*pp_y, min(x+DX,c+ip_x) + 2*pp_x
     patch = img_padded[:,z:ze,y:ye,x:xe]
     with torch.no_grad():
-      patch = torch.from_numpy(patch).cuda().float()
+      patch = torch.from_numpy(patch).float().cuda()
       patch = net(patch[None])[0,:,pp_z:-pp_z,pp_y:-pp_y,pp_x:-pp_x].detach().cpu().numpy()
     ## end coordinates of unpadded output (not including border)
     ae,be,ce = min(z+DZ,a),min(y+DY,b),min(x+DX,c)
@@ -434,8 +506,46 @@ def predict_raw(net,img,dims,**kwargs):
     if dims=="NZYX":
       def f(i): return apply_net_tiled_3d(net,img[i,None],**kwargs)[0]
       res = np.array([f(i) for i in range(img.shape[0])])
-
   return res
+
+def predict_keepchan(net,img,dims,**kwargs):
+  """
+  each elem of N dimension sent to gpu separately.
+  When possible, try to make the output dimensions match the input dimensions by e.g. removing singleton dims.
+  """
+  assert dims in ["NCYX","NBCYX","CYX","ZYX","CZYX","NCZYX","NZYX","YX"]
+
+  with torch.no_grad():
+    if dims=="NCYX":
+      # def f(i): return net(torch.from_numpy(img[[i]]).cuda().float()).cpu().numpy()[0]
+      def f(i): return apply_net_2d(net,img[[i]],**kwargs)
+      res = np.array([f(i) for i in range(img.shape[0])])
+    if dims=="NBCYX":
+      # def f(i): return net(torch.from_numpy(img[i]).cuda().float()).cpu().numpy()
+      def f(i): return apply_net_2d(net,img[i],**kwargs)
+      res = np.array([f(i) for i in range(img.shape[0])])
+    if dims=="CYX":
+      res = apply_net_2d(net,img,**kwargs)
+      # res = net(torch.from_numpy(img[None]).cuda().float()).cpu().numpy()[0]
+    if dims=="YX":
+      res = apply_net_2d(net,img[None],**kwargs)
+      # [0]
+      # res = net(torch.from_numpy(img[None,None]).cuda().float()).cpu().numpy()[0,0]
+    if dims=="ZYX":
+      ## assume 1 channel. remove after prediction.
+      res = apply_net_tiled_3d(net,img[None],**kwargs) #[0]
+    if dims=="CZYX":
+      res = apply_net_tiled_3d(net,img)
+    if dims=="NCZYX":
+      def f(i): return apply_net_tiled_3d(net,img[i],**kwargs)[0]
+      res = np.array([f(i) for i in range(img.shape[0])])
+    if dims=="NZYX":
+      def f(i): return apply_net_tiled_3d(net,img[i,None],**kwargs)[0]
+      res = np.array([f(i) for i in range(img.shape[0])])
+  return res
+
+
+
 
 
 

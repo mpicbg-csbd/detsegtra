@@ -90,9 +90,9 @@ def seg(lab_gt, lab, partial_dataset=False):
   else:
     return n_matched / n_gt
 
-def precision(lab_gt, lab, iou=0.5, partial_dataset=False):
+def matching_IOU(lab_gt, lab, iou=0.5, partial_dataset=False):
   """
-  precision = TP / (TP + FP + FN) i.e. "intersection over union" for a graph matching
+  matching_IOU = TP / (TP + FP + FN) i.e. "intersection over union" for a graph matching
   """
   psg = pixel_sharing_bipartite(lab_gt, lab)
   matching = matching_iou(psg, fraction=iou)
@@ -105,6 +105,91 @@ def precision(lab_gt, lab, iou=0.5, partial_dataset=False):
     return n_matched , (n_gt + n_hyp - n_matched)
   else:
     return n_matched / (n_gt + n_hyp - n_matched)
+
+def det(lab_gt, lab, return_counts=True):
+  """
+  calculate seg from pixel_sharing_bipartite
+  seg is the average conditional-iou across ground truth cells
+  conditional-iou gives zero if not in matching
+  ----
+  calculate conditional intersection over union (CIoU) from matching & pixel_sharing_bipartite
+  for a fraction > 0.5 matching. Any CIoU between matching pairs will be > 1/3. But there may be some
+  IoU as low as 1/2 that don't match, and thus have CIoU = 0.
+  """
+  psg = pixel_sharing_bipartite(lab_gt, lab)
+  iou = intersection_over_union(psg)
+  matching = matching_overlap(psg, fractions=(0.5, 0))
+  matching[0,:] = False
+  matching[:,0] = False
+  
+  inds_gt = psg.sum(1)>0; inds_gt[0]=False
+  inds_y  = psg.sum(0)>0; inds_y[0]=False
+
+  # n_gt = matching.shape[0]-1
+  n_gt = len(set(np.unique(lab_gt)) - {0})
+  n_gt = inds_gt.sum()
+  n_y  = inds_y.sum()
+
+  n_ref_tp = (matching.sum(1)[inds_gt]==1).sum() ## True Positives  from Reference (GT) Set
+  n_ref_fn = (matching.sum(1)[inds_gt]==0).sum() ## False Negatives from Reference (GT) Set
+  assert n_ref_tp + n_ref_fn == n_gt, "assert n_ref_tp + n_ref_fn == n_gt, "
+
+  n_pro_tp = (matching.sum(0)[inds_y]==1).sum() ## True Positives  from Proposed (Y) Set
+  n_pro_fp = (matching.sum(0)[inds_y]==0).sum() ## False Positives from Proposed (Y) Set
+  n_pro_mm = (matching.sum(0)[inds_y]>=2).sum() ## Multi-Matched Proposals
+  n_pro_ns = (matching.sum(0) - matching.max(0))[inds_y].sum() ## Number of Extra matches that will have to be split apart
+
+  # assert n_pro_tp == n_ref_tp
+  assert n_pro_tp + n_pro_fp + n_pro_mm == n_y, "assert n_pro_tp + n_pro_fp + n_pro_mm == n_y"
+  assert n_pro_tp + n_pro_mm + n_pro_ns == n_ref_tp, "assert n_pro_tp + n_pro_mm + n_pro_ns == n_ref_tp"
+
+  res = dict(
+    n_gt = n_gt,
+    n_y  = n_y,
+    n_ref_tp = n_ref_tp,
+    n_ref_fn = n_ref_fn,
+    n_pro_tp = n_pro_tp,
+    n_pro_fp = n_pro_fp,
+    n_pro_mm = n_pro_mm,
+    n_pro_ns = n_pro_ns,
+    )
+
+  if return_counts:
+    return _det(res), res
+  else:
+    return _det(res)
+
+
+
+from types import SimpleNamespace
+
+
+def _det(res, ignore_FP=False):
+
+  if type(res) is dict: res = SimpleNamespace(**res)
+
+  n_gt = res.n_gt
+  n_y  = res.n_y
+  n_ref_tp = res.n_ref_tp
+  n_ref_fn = res.n_ref_fn
+  n_pro_tp = res.n_pro_tp
+  n_pro_fp = res.n_pro_fp
+  n_pro_mm = res.n_pro_mm
+  n_pro_ns = res.n_pro_ns
+
+  ## ISBI Cell Tracking Challenge Weights
+  wNS = 5 # for vertex splitting, 
+  wFN = 10  # for vertex adding, 
+  wFP = 1 # for vertex deleting, wED = 1 for edge
+
+  aogm0 = wFN*n_gt ## every object is a false negative
+  aogm  = wNS*n_pro_ns + wFN*n_ref_fn
+  if not ignore_FP: aogm += wFP*n_pro_fp 
+  
+  aogm  = 1 - min(aogm, aogm0) / aogm0 ## as defined here http://celltrackingchallenge.net/evaluation-methodology/
+
+  return aogm
+
 
 ## objects for matchings ... sets, maps and masks
 

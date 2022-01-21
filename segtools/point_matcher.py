@@ -59,20 +59,33 @@ def match_unambiguous_nearestNeib(_pts_gt,_pts_yp,dub=10,scale=[1,1,1]):
   If regions _do_ overlap, then this second criterion is active (nucleus center is nearest neib of proposed point).
   We could solve an assignment problem with Hungarian matching to enable even more flexible matching.
   This is only necessary if we have overlapping regions, and it might be possible that proposed point X matches to gt point Y1 even though it is closer to Y2.
+
+  Tue Apr 13 13:35:02 2021
+  Return nan for precision|recall|f1 when number of objects is zero
   """
 
   res = SimpleNamespace()
 
-  if 0 in _pts_gt.shape or 0 in _pts_yp.shape:
-    res.n_matched  = 0
-    res.n_proposed = len(_pts_yp)
-    res.n_gt       = len(_pts_gt)
-    res.f1 = 0.0
-    res.precision = 0.0
-    res.recall = 0.0
-    # res.dists  = np.zeros(len(_pts_gt))-1
-    # res.gt2yp  = np.zeros(len(_pts_gt))-1
+  def _final_scores(n_m,n_p,n_gt):
+    with np.errstate(divide='ignore',invalid='ignore'):
+      precision = np.divide(n_m  ,  n_p)
+      recall    = np.divide(n_m  ,  n_gt)
+      f1        = np.divide(2*n_m,  (n_p + n_gt))
+
+    res = SimpleNamespace()
+    res.n_matched = n_m
+    res.n_proposed = n_p
+    res.n_gt = n_gt
+    res.precision = precision
+    res.f1 = f1
+    res.recall = recall
     return res
+
+  if len(_pts_gt)==0 or len(_pts_yp)==0:
+    n_matched  = 0
+    n_proposed = len(_pts_yp)
+    n_gt       = len(_pts_gt)
+    return _final_scores(n_matched,n_proposed,n_gt)
 
   pts_gt = np.array(_pts_gt) * scale ## for matching in anisotropic spaces
   pts_yp = np.array(_pts_yp) * scale ## for matching in anisotropic spaces
@@ -93,11 +106,12 @@ def match_unambiguous_nearestNeib(_pts_gt,_pts_yp,dub=10,scale=[1,1,1]):
   assert res.gt_matched_mask.sum() == res.yp_matched_mask.sum()
   res.gt2yp = gt2yp
   res.yp2gt = yp2gt
+  res.pts_gt = _pts_gt ## take normal points, not rescaled!
+  res.pts_yp = _pts_yp ## take normal points, not rescaled!
+
   res.n_matched  = res.gt_matched_mask.sum()
   res.n_proposed = len(pts_yp)
   res.n_gt       = len(pts_gt)
-  res.pts_gt = _pts_gt ## take normal points, not rescaled!
-  res.pts_yp = _pts_yp ## take normal points, not rescaled!
   res.precision  = res.n_matched / res.n_proposed
   res.recall     = res.n_matched / res.n_gt
   res.f1         = 2*res.n_matched / (res.n_proposed + res.n_gt)

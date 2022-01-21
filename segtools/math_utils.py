@@ -182,7 +182,6 @@ def se2slice(s,e):
   return tuple(slice(a,b) for a,b in zip(s,e))
 
 
-
 ## place gaussians within 3D volume
 
 @DeprecationWarning

@@ -84,7 +84,7 @@ def _save_file(dir,name,v):
   if type(v) is torch.Tensor: v = v.numpy()
 
   if type(v) is np.ndarray and v.dtype == np.uint8 and (v.ndim==2 or (v.ndim==3 and v.shape[2] in [3,4])):
-    io.imsave(dir/(name +'.png'),v)
+    io.imsave(dir/(name +'.png'),v,check_contrast=False)
   elif type(v) is np.ndarray:
     if v.dtype is np.dtype('O'):
       pickle.dump(v,open(dir/(name +'.pkl'),'wb'))
@@ -103,7 +103,7 @@ def load(base,regex='.'):
   res  = dict()
   base = Path(base).resolve()
 
-  if not base.exists(): print("MIssing: ", base)
+  if not base.exists(): print("Missing: ", base)
 
   # import ipdb; ipdb.set_trace()
   if base.suffix in known_filetypes:
@@ -111,7 +111,7 @@ def load(base,regex='.'):
 
   from segtools.python_utils import sorted_alphanum
   for d in sorted_alphanum(map(str, (base.iterdir()))):
-    print(d)
+    # print(d)
     d=Path(d)
     d2 = clean(d.stem)
 
@@ -139,26 +139,33 @@ def load(base,regex='.'):
   return SimpleNamespace(**res)
 
 extension_to_read = {
-  '.npy': lambda f : np.load(f),
+  '.npy': lambda f : np.load(f,allow_pickle=True),
   '.png': lambda f : np.array(io.imread(f)),
   '.tif': lambda f : tifffile.imread(str(f)),
   '.tiff':lambda f : tifffile.imread(str(f)),
-  '.pkl': lambda f : pickle.load(open(f,'rb')),
+  '.pkl': lambda f : pickleload(str(f)),
   '.json':lambda f : json.load(open(f,'r')),
   '.mat': lambda f : SimpleNamespace(**loadmat(f)),
   '.zarr':lambda f : zarr.open_array(str(f)),
   }
 
 extension_to_write = {
-  '.npy':lambda  f,x : np.save(f,x),
-  '.png':lambda  f,x : io.imsave(f,x),
+  '.npy':lambda  f,x : np.save(f,x,allow_pickle=True),
+  '.png':lambda  f,x : io.imsave(f,x,check_contrast=False),
   '.tif':lambda  f,x : tifffile.imsave(str(f),x),
   '.tiff':lambda f,x : tifffile.imsave(str(f),x),
-  '.pkl':lambda  f,x : pickle.dump(x,open(f,'wb')),
+  '.pkl':lambda  f,x : pickledump(x,f),
   '.json':lambda f,x : json.dump(x,open(f,'w')),
   '.zarr':lambda f,x : zarr.save_array(str(f),x),
   }
 
+def pickledump(x,_file):
+  with open(_file,'wb') as _f:
+    pickle.dump(x,_f)
+
+def pickleload(_file):
+  with open(_file,'rb') as _f:
+    return pickle.load(_f)
 
 def _load_file(name):
   name = Path(name)
