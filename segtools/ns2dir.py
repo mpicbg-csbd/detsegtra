@@ -10,7 +10,9 @@ import re
 import torch
 import collections
 from scipy.io import loadmat
+import zarr
 
+import shutil
 import ipdb
 
 def clean(s):
@@ -25,12 +27,13 @@ def clean(s):
   s = s2 if s2 else "d"+s
   return s
 
-known_filetypes = ['.npy', '.png', '.tif', '.tiff', '.pkl', '.json', '.mat']
+known_filetypes = ['.npy', '.png', '.tif', '.tiff', '.pkl', '.json', '.mat', '.zarr']
 known_scalars = [bool,int,tuple,range,float,str,bytes,Path,PosixPath]
 known_py_collections = [dict, set, list]
 # known_array_collection = [np.ndarray, torch.Tensor]
 
 def _is_scalar(x):
+  if x is None: return True
   if type(x) in known_scalars: return True
   if 'float' in str(type(x)): return True
   if 'int' in str(type(x)): return True
@@ -56,6 +59,9 @@ def save(d, base):
 
   assert type(d) is SimpleNamespace
 
+  if base.exists() and base.is_dir() and "expr" in str(base):
+    shutil.rmtree(str(base))
+
   scalars = SimpleNamespace()
   for k,v in d.__dict__.items():
 
@@ -80,9 +86,12 @@ def _save_file(dir,name,v):
   if type(v) is np.ndarray and v.dtype == np.uint8 and (v.ndim==2 or (v.ndim==3 and v.shape[2] in [3,4])):
     io.imsave(dir/(name +'.png'),v)
   elif type(v) is np.ndarray:
-    file = str(dir/(name +".tif"))
-    tifffile.imsave(file,v,compress=0)
-    # np.save(dir/(name +'.npy'),v)
+    if v.dtype is np.dtype('O'):
+      pickle.dump(v,open(dir/(name +'.pkl'),'wb'))
+    # file = str(dir/(name +".tif"))
+    # tifffile.imsave(file,v,compress=0)
+    else:
+      np.save(dir/(name +'.npy'),v)
   elif type(v) in known_py_collections:
     try:
       json.dump(v,open(dir/(name +'.json'),'w'))
@@ -137,6 +146,7 @@ extension_to_read = {
   '.pkl': lambda f : pickle.load(open(f,'rb')),
   '.json':lambda f : json.load(open(f,'r')),
   '.mat': lambda f : SimpleNamespace(**loadmat(f)),
+  '.zarr':lambda f : zarr.open_array(str(f)),
   }
 
 extension_to_write = {
@@ -146,6 +156,7 @@ extension_to_write = {
   '.tiff':lambda f,x : tifffile.imsave(str(f),x),
   '.pkl':lambda  f,x : pickle.dump(x,open(f,'wb')),
   '.json':lambda f,x : json.dump(x,open(f,'w')),
+  '.zarr':lambda f,x : zarr.save_array(str(f),x),
   }
 
 

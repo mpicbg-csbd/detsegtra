@@ -143,7 +143,7 @@ class Unet2(nn.Module):
     c3 = maxpool(self.pool)(c2)
     c3 = self.l_ef(c3)
     c3 = F.interpolate(c3,scale_factor=self.pool)
-    c3 = torch.cat([c3,c2],1)
+    c3 = torch.cat([c3,c2],1) # concat on channels
     c3 = self.l_gh(c3)
     c3 = F.interpolate(c3,scale_factor=self.pool)
     c3 = torch.cat([c3,c1],1)
@@ -152,6 +152,39 @@ class Unet2(nn.Module):
 
     return out1
 
+class Unet1(nn.Module):
+  """
+  Small Unet for tiny data.
+  """
+
+  def __init__(self, c=32, io=[[1],[1]], finallayer=nn.LeakyReLU, pool=(1,2,2), kernsize=(3,5,5)):
+    super(Unet1, self).__init__()
+
+    self.pool = pool
+    self.kernsize = kernsize
+    self.finallayer = finallayer
+    pad = tuple(x//2 for x in kernsize)
+
+    self.l_ab = n_conv([io[0][0], c, c,], kernsize, padding=pad)
+    self.l_cd = n_conv([1*c, 2*c,  1*c,], kernsize, padding=pad)
+    self.l_ef = n_conv([2*c, 1*c,  1*c,], kernsize, padding=pad)
+
+    conv = {2:nn.Conv2d,3:nn.Conv3d}[len(kernsize)]
+    self.l_o  = nn.Sequential(conv(1*c,io[1][0],(1,)*len(kernsize),padding=0), finallayer())
+
+  def forward(self, x):
+
+    maxpool = {2:nn.MaxPool2d,3:nn.MaxPool3d}[len(self.kernsize)]
+
+    c1 = self.l_ab(x)
+    c2 = maxpool(self.pool)(c1)
+    c2 = self.l_cd(c2)
+    c3 = F.interpolate(c2,scale_factor=self.pool)
+    c3 = torch.cat([c3,c1],1)
+    c3 = self.l_ef(c3)
+    out1 = self.l_o(c3)
+
+    return out1
 
 ## resnets are incomplete
 
@@ -246,7 +279,7 @@ import numpy as np
 import itertools
 from math import ceil
 
-def apply_net_2d(net,img,pp_zyx=(64,64), D_zyx=(400,400)):
+def apply_net_2d(net,img,patch_boundary=(128,128),patch_inner=(256,256)):
   """
   Turns off gradients.
   Does not perform normalization.
@@ -259,6 +292,14 @@ def apply_net_2d(net,img,pp_zyx=(64,64), D_zyx=(400,400)):
   # patchshape        = [16,200,200] ## must be divisible by 8 to avoid artifacts.
   # stride            = [16,200,200] ## same as patchshape in this case
   # def g(n,m): return floor(n/m)*m-n ## f(n,m) gives un-padding needed for n to be divisible by m
+
+  # a,b = img.shape[-2:]
+  # if a<800 and b<800:
+  #   with torch.no_grad():
+  #     x = torch.from_numpy(img).cuda().float()
+  #     return net(x[None])[0].detach().cpu().numpy()
+
+
   def f(n,m): return ceil(n/m)*m-n ## gives padding needed for n to be divisible by m
 
   assert img.ndim==3
@@ -273,11 +314,11 @@ def apply_net_2d(net,img,pp_zyx=(64,64), D_zyx=(400,400)):
   ## max total size with Unet3 16 input channels (64,528,528) = 
   ## padding per patch. must be divisible by 8. read as e.g. "PatchPad_Z"
   # pp_z,pp_y,pp_x = 8,64,64
-  pp_y,pp_x = pp_zyx
-  # assert all([x%8==0 for x in pp_zyx])
+  pp_y,pp_x = patch_boundary
+  # assert all([x%8==0 for x in patch_boundary])
   ## inner patch size (does not include patch border. also will be smaller at boundary)
-  DY,DX = D_zyx
-  # assert all([x%8==0 for x in D_zyx])
+  DY,DX = patch_inner
+  # assert all([x%8==0 for x in patch_inner])
 
   img_padded = np.pad(img,[(0,0),(pp_y,pp_y+ip_y),(pp_x,pp_x+ip_x)],mode='constant')
   output = np.zeros(img.shape)
@@ -289,6 +330,7 @@ def apply_net_2d(net,img,pp_zyx=(64,64), D_zyx=(400,400)):
 
   ## start coordinates of padded input (e.g. top left patch corner)
   for x,y in itertools.product(xs,ys):
+    print(x,y)
     ## end coordinates of padded input (including patch border)
     ye,xe = min(y+DY,b+ip_y) + 2*pp_y, min(x+DX,c+ip_x) + 2*pp_x
     patch = img_padded[:,y:ye,x:xe]
@@ -301,7 +343,6 @@ def apply_net_2d(net,img,pp_zyx=(64,64), D_zyx=(400,400)):
     output[:,y:be,x:ce] = patch[:,:be-y,:ce-x]
 
   return output
-
 
 def apply_net_tiled_3d(net,img, pp_zyx=(8,64,64), D_zyx=(48,400,400)):
   """
@@ -337,7 +378,8 @@ def apply_net_tiled_3d(net,img, pp_zyx=(8,64,64), D_zyx=(48,400,400)):
   # assert all([x%8==0 for x in D_zyx])
 
   img_padded = np.pad(img,[(0,0),(pp_z,pp_z+ip_z),(pp_y,pp_y+ip_y),(pp_x,pp_x+ip_x)],mode='constant')
-  output = np.zeros(img.shape)
+  chanOUT = 1
+  output = np.zeros((chanOUT,a,b,c))
 
   ## start coordinates for each patch in the padded input. each stride must be divisible by 8.
   zs = np.r_[:a:DZ]
@@ -358,3 +400,44 @@ def apply_net_tiled_3d(net,img, pp_zyx=(8,64,64), D_zyx=(48,400,400)):
     output[:,z:ae,y:be,x:ce] = patch[:,:ae-z,:be-y,:ce-x]
 
   return output
+
+def predict_raw(net,img,dims,**kwargs):
+  """
+  each elem of N dimension sent to gpu separately.
+  When possible, try to make the output dimensions match the input dimensions by e.g. removing singleton dims.
+  """
+  assert dims in ["NCYX","NBCYX","CYX","ZYX","CZYX","NCZYX","NZYX","YX"]
+
+  with torch.no_grad():
+    if dims=="NCYX":
+      # def f(i): return net(torch.from_numpy(img[[i]]).cuda().float()).cpu().numpy()[0]
+      def f(i): return apply_net_2d(net,img[[i]],**kwargs)
+      res = np.array([f(i) for i in range(img.shape[0])])
+    if dims=="NBCYX":
+      # def f(i): return net(torch.from_numpy(img[i]).cuda().float()).cpu().numpy()
+      def f(i): return apply_net_2d(net,img[i],**kwargs)
+      res = np.array([f(i) for i in range(img.shape[0])])
+    if dims=="CYX":
+      res = apply_net_2d(net,img,**kwargs)
+      # res = net(torch.from_numpy(img[None]).cuda().float()).cpu().numpy()[0]
+    if dims=="YX":
+      res = apply_net_2d(net,img[None],**kwargs)[0]
+      # res = net(torch.from_numpy(img[None,None]).cuda().float()).cpu().numpy()[0,0]
+    if dims=="ZYX":
+      ## assume 1 channel. remove after prediction.
+      res = apply_net_tiled_3d(net,img[None],**kwargs)[0]
+    if dims=="CZYX":
+      res = apply_net_tiled_3d(net,img)
+    if dims=="NCZYX":
+      def f(i): return apply_net_tiled_3d(net,img[i],**kwargs)[0]
+      res = np.array([f(i) for i in range(img.shape[0])])
+    if dims=="NZYX":
+      def f(i): return apply_net_tiled_3d(net,img[i,None],**kwargs)[0]
+      res = np.array([f(i) for i in range(img.shape[0])])
+
+  return res
+
+
+
+
+
