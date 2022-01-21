@@ -38,8 +38,10 @@ def rsync_pull2(targetfile="/Users/broaddus/Desktop/project-broaddus/devseg_2/e0
 
   ## rsync
   # user@<source>:<source_dir> <dest_dir>
-  flags = ' -mapHAXxv --numeric-ids --delete --progress -e "ssh -T -c arcfour -o Compression=no -x" '
-  flags = ' -mapv --numeric-ids --delete --progress '
+  flags = ' -mapv     --numeric-ids --delete --progress '
+  # broken -- flags = ' -mapHAXxv --numeric-ids --delete --progress -e "ssh -T -c arcfour -o Compression=no -x" '
+  # broken -- flags = ' -avAXEWSlHh --numeric-ids --delete --progress --no-compress '
+  flags = ' -avhW --progress --compress-level=0 '
   args = flags + args
   run([f"mkdir -p {localdir}"],shell=True)
   cmd = f"rsync {args} efal:{remote}/{shared_extension} {local_pull}/{shared_extension} > rsync.out 2>&1"
@@ -50,7 +52,8 @@ def rsync_pull2(targetfile="/Users/broaddus/Desktop/project-broaddus/devseg_2/e0
   # return
 
   if return_value:
-    run([cmd], shell=True)
+    res = run([cmd], shell=True)
+    print(res)
     x=local_pull/shared_extension
     # print(json.dumps(locals(),sort_keys=True, indent=2, default=str))
     return load(x)

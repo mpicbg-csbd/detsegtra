@@ -90,6 +90,25 @@ def seg(lab_gt, lab, partial_dataset=False):
   else:
     return n_matched / n_gt
 
+def det(lab_gt, lab, ignoreFP=False, partial_dataset=False):
+  """
+  like precision except the matching is asymmetric
+  # TODO; what do they do when ignoring false positives?
+  """
+  psg = pixel_sharing_bipartite(lab_gt, lab)
+  matching = matching_overlap(psg, fractions=(0.5,0))
+  # assert matching.sum(0).max() < 2
+  assert matching.sum(1).max() <= 1 ## A GT object (dim=0) can match to 0|1 proposals.
+  n_gt  = len(set(np.unique(lab_gt)) - {0})
+  n_hyp = len(set(np.unique(lab)) - {0})
+  n_matched = matching.sum()
+  if partial_dataset:
+    return n_matched , (n_gt + n_hyp - n_matched)
+  if ignoreFP:
+    return n_matched / n_gt
+  else:
+    return n_matched / (n_gt + n_hyp - n_matched)
+
 def precision(lab_gt, lab, iou=0.5, partial_dataset=False):
   """
   precision = TP / (TP + FP + FN) i.e. "intersection over union" for a graph matching

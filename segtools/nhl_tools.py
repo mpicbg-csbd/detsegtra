@@ -9,7 +9,14 @@ from scipy import ndimage as nd
 from scipy.ndimage import label
 from scipy.signal import gaussian
 from sklearn.mixture import GaussianMixture
-from skimage.morphology import watershed
+
+import skimage
+
+if skimage.__version__=='0.19.1':
+  from skimage.segmentation import watershed
+else:
+  from skimage.morphology import watershed
+
 from skimage.feature import peak_local_max
 from skimage import measure
 

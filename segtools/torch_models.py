@@ -5,7 +5,7 @@ import numpy as np
 
 from torchsummary import summary
 
-import gc,sys,psutil,os,py
+import gc,sys,psutil,os
 
 
 @DeprecationWarning
