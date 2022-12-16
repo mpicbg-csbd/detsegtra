@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import numpy as np
 
 from types import SimpleNamespace
-from torchsummary import summary
+# from torchsummary import summary
 
 
 import gc,sys,psutil,os #,py
@@ -33,10 +33,11 @@ def receptivefield(net,kern=(3,5,5)):
       m.bias.data.fill_(0.0)
   net.apply(rfweights);
   if len(kern)==3:
-    x0 = np.zeros((128,128,128)); x0[64,64,64]=1;
+    x0 = np.zeros((256,256,256)); x0[128,128,128]=1;
   elif len(kern)==2:
-    x0 = np.zeros((256,256)); x0[128,128]=1;
-  xout = net.cuda()(torch.from_numpy(x0)[None,None].float().cuda()).detach().cpu().numpy()
+    x0 = np.zeros((512,512)); x0[256,256]=1;
+  device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+  xout = net.to(device)(torch.from_numpy(x0)[None,None].float().to(device)).detach().cpu().numpy()
   return xout
 
 def init_weights(net):
@@ -417,13 +418,13 @@ def apply_net_2d(net,img,outchan=1,patch_boundary=(128,128),patch_inner=(256,256
 
 #   return output
 
+"""
+Turns off gradients.
+Does not perform normalization.
+Applies net to image with dims Channels,Z,Y,X.
+Assume 3x or less max pooling layers => (U-net) discrete translational symmetry with period 2^n for n in [0,1,2,3].
+"""
 def apply_net_tiled_3d(net,img,outchan=1,pp_zyx=(8,64,64), D_zyx=(48,400,400)):
-  """
-  Turns off gradients.
-  Does not perform normalization.
-  Applies net to image with dims Channels,Z,Y,X.
-  Assume 3x or less max pooling layers => (U-net) discrete translational symmetry with period 2^n for n in [0,1,2,3].
-  """
 
   # borders           = [8,24,24] ## border width within each patch that is thrown away after prediction
   # patchshape_padded = [32,240,240] ## the size of the patch that we feed into the net. must be divisible by 8 or net fails.
@@ -474,11 +475,12 @@ def apply_net_tiled_3d(net,img,outchan=1,pp_zyx=(8,64,64), D_zyx=(48,400,400)):
 
   return output
 
+"""
+each elem of N dimension sent to gpu separately.
+When possible, try to make the output dimensions match the input dimensions by e.g. removing singleton dims.
+DEPRECATED in favor of keepchan
+"""
 def predict_raw(net,img,dims,**kwargs):
-  """
-  each elem of N dimension sent to gpu separately.
-  When possible, try to make the output dimensions match the input dimensions by e.g. removing singleton dims.
-  """
   assert dims in ["NCYX","NBCYX","CYX","ZYX","CZYX","NCZYX","NZYX","YX"]
 
   with torch.no_grad():
@@ -509,31 +511,28 @@ def predict_raw(net,img,dims,**kwargs):
       res = np.array([f(i) for i in range(img.shape[0])])
   return res
 
+
+
+"""
+each elem of N dimension sent to gpu separately.
+When possible, try to make the output dimensions match the input dimensions by e.g. removing singleton dims.
+keep all channels in predicted image
+"""
 def predict_keepchan(net,img,dims,**kwargs):
-  """
-  each elem of N dimension sent to gpu separately.
-  When possible, try to make the output dimensions match the input dimensions by e.g. removing singleton dims.
-  """
   assert dims in ["NCYX","NBCYX","CYX","ZYX","CZYX","NCZYX","NZYX","YX"]
 
   with torch.no_grad():
     if dims=="NCYX":
-      # def f(i): return net(torch.from_numpy(img[[i]]).cuda().float()).cpu().numpy()[0]
       def f(i): return apply_net_2d(net,img[[i]],**kwargs)
       res = np.array([f(i) for i in range(img.shape[0])])
     if dims=="NBCYX":
-      # def f(i): return net(torch.from_numpy(img[i]).cuda().float()).cpu().numpy()
       def f(i): return apply_net_2d(net,img[i],**kwargs)
       res = np.array([f(i) for i in range(img.shape[0])])
     if dims=="CYX":
       res = apply_net_2d(net,img,**kwargs)
-      # res = net(torch.from_numpy(img[None]).cuda().float()).cpu().numpy()[0]
     if dims=="YX":
       res = apply_net_2d(net,img[None],**kwargs)
-      # [0]
-      # res = net(torch.from_numpy(img[None,None]).cuda().float()).cpu().numpy()[0,0]
     if dims=="ZYX":
-      ## assume 1 channel. remove after prediction.
       res = apply_net_tiled_3d(net,img[None],**kwargs) #[0]
     if dims=="CZYX":
       res = apply_net_tiled_3d(net,img)

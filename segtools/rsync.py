@@ -11,7 +11,7 @@ remote        = Path("/projects/project-broaddus/")
 
 def rsync_pull2(targetfile="/Users/broaddus/Desktop/project-broaddus/devseg_2/e02/test/", cleardir=False, justfiles=False, return_value=True, excludes=[]):
   targetfile = Path(targetfile)
-  shared_extension = str(targetfile).replace("/lustre/","").replace("/projects/project-broaddus/","").replace("/Users/broaddus/Desktop/project-broaddus/","")
+  shared_extension = str(targetfile).replace("/lustre/","").replace("/projects/project-broaddus/","").replace("/Users/broaddus/Desktop/mpi-remote/project-broaddus/","")
   # extension = 
   # localpath = localpath.replace("/lustre/projects/project-broaddus/","/Users/broaddus/Desktop/project-broaddus/")
   # localpath = localpath.replace("/projects/project-broaddus/","/Users/broaddus/Desktop/project-broaddus/")
@@ -59,7 +59,6 @@ def rsync_pull2(targetfile="/Users/broaddus/Desktop/project-broaddus/devseg_2/e0
     return load(x)
   else:
     Popen([cmd], shell=True)
-
 
 
 def rsync_pull(localpath="/Users/broaddus/Desktop/project-broaddus/devseg_2/e02/test/", cleardir=False, justfiles=False, return_value=True, _pull=True):

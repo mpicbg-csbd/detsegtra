@@ -260,14 +260,15 @@ def place_gaussian_at_pts_subpixel(pts,s=[3,3],ks=[63,63],sh=[64,64]):
   target = conv_at_pts4(pts,kern,sh,lambda a,b:np.maximum(a,b))
   return target
 
+
+"""
+sigmas = sigma for gaussian
+shape = target/container shape
+"""
 def place_gaussian_at_pts(pts,sigmas=[3,3],shape=[64,64]):
-  """
-  sigmas = sigma for gaussian
-  shape = target/container shape
-  """
   s  = np.array(sigmas)
   ks = (7*s).astype(int)
-  ks = ks - ks%2 + 1## enfore ODD shape so kernel is centered! (grow even dims by 1 pix)
+  ks = ks - ks%2 + 1 ## enfore ODD shape so kernel is centered! (grow even dims by 1 pix)
   sh = shape
 
   def f(x):
@@ -277,7 +278,6 @@ def place_gaussian_at_pts(pts,sigmas=[3,3],shape=[64,64]):
   kern = kern / kern.max()
   target = conv_at_pts4(pts,kern,sh,lambda a,b:np.maximum(a,b))
   return target
-
 
 def conv_at_pts4(pts,kern,sh,func=lambda a,b:a+b):
   "kernel is centered on pts. kern must have odd shape. sh is shape of output array."
