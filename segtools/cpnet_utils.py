@@ -196,29 +196,6 @@ def createTarget(pts, target_shape, sigmas):
 
   return target
 
-def testSplitIntoPatches(viewer):
-  for w in [200,150,180,299,300,301]:
-    for w0 in [22,24,32]:
-      sw = (w,301)
-      pw = (24,24)
-      bw = (4,4)
-
-      patches = splitIntoPatches(sw, pw, bw)
-
-      inner = np.zeros(sw)
-      outer = np.zeros(sw)
-      for p in patches:
-        inner[p.inner] += 1
-        outer[p.outer] += 1
-      ui = np.unique(inner) 
-      uo = np.unique(outer)
-      print(ui,uo)
-      assert set(ui) == {1}
-      assert set(uo) <= {1,2,4}
-
-  # viewer.add_image(inner)
-  # viewer.add_image(outer)
-
 def splitIntoPatches(img_shape, outer_shape=(256,256), min_border_shape=(24,24)):
   """
   Split image into non-overlapping `inner` rectangles that exactly cover
@@ -293,6 +270,29 @@ def splitIntoPatches(img_shape, outer_shape=(256,256), min_border_shape=(24,24))
   res = [g(s) for s in product(*slices_lists)]
   return res
 
+
+def testSplitIntoPatches(viewer):
+  for w in [200,150,180,299,300,301]:
+    for w0 in [22,24,32]:
+      sw = (w,301)
+      pw = (24,24)
+      bw = (4,4)
+
+      patches = splitIntoPatches(sw, pw, bw)
+
+      inner = np.zeros(sw)
+      outer = np.zeros(sw)
+      for p in patches:
+        inner[p.inner] += 1
+        outer[p.outer] += 1
+      ui = np.unique(inner) 
+      uo = np.unique(outer)
+      print(ui,uo)
+      assert set(ui) == {1}
+      assert set(uo) <= {1,2,4}
+
+  # viewer.add_image(inner)
+  # viewer.add_image(outer)
 
 
 
